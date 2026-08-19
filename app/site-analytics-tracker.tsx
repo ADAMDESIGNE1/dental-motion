@@ -10,6 +10,15 @@ const VISITOR_KEY =
 const SESSION_KEY =
   "adam-site-session-id";
 
+/*
+ * إذا هذا المتصفح استُخدم بحساب أدمن أو طبيب،
+ * نعتبره جهاز داخلي وما نحسب زياراته العامة بعدين.
+ */
+const INTERNAL_DEVICE_KEY =
+  "adam-site-internal-device";
+
+const HUMAN_DELAY_MS = 2500;
+
 function createId() {
   if (
     typeof crypto !== "undefined" &&
@@ -23,6 +32,66 @@ function createId() {
     .slice(2)}-${Math.random()
     .toString(36)
     .slice(2)}`;
+}
+
+function isPrivatePath(
+  pathname: string
+) {
+  return (
+    pathname.startsWith(
+      "/admin"
+    ) ||
+    pathname.startsWith(
+      "/doctor-dashboard"
+    ) ||
+    pathname.startsWith(
+      "/doctor-login"
+    ) ||
+    pathname.startsWith(
+      "/register"
+    )
+  );
+}
+
+function isLocalOrPreview() {
+  const host =
+    window.location.hostname
+      .toLowerCase();
+
+  return (
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    host === "::1" ||
+    host.startsWith(
+      "deploy-preview-"
+    ) ||
+    host.startsWith(
+      "branch-"
+    )
+  );
+}
+
+function looksLikeBot() {
+  const ua =
+    navigator.userAgent
+      .toLowerCase();
+
+  const botPattern =
+    /bot|crawler|spider|crawling|headless|lighthouse|pagespeed|googlebot|bingbot|duckduckbot|baiduspider|yandexbot|slurp|facebookexternalhit|whatsapp|telegrambot|discordbot|semrush|ahrefs|uptimerobot|monitoring|synthetic|phantomjs|selenium|puppeteer|playwright/i;
+
+  const webdriver =
+    Boolean(
+      (
+        navigator as Navigator & {
+          webdriver?: boolean;
+        }
+      ).webdriver
+    );
+
+  return (
+    webdriver ||
+    botPattern.test(ua)
+  );
 }
 
 function getBrowserName() {
@@ -132,22 +201,63 @@ function getReferrerHost() {
   }
 }
 
-function shouldSkipPath(
-  pathname: string
-) {
-  return (
-    pathname.startsWith(
-      "/admin"
-    ) ||
-    pathname.startsWith(
-      "/doctor-dashboard"
-    ) ||
-    pathname.startsWith(
-      "/doctor-login"
-    ) ||
-    pathname.startsWith(
-      "/register"
-    )
+function waitForVisibleHumanPage() {
+  return new Promise<void>(
+    (resolve) => {
+      let timer:
+        | ReturnType<
+            typeof setTimeout
+          >
+        | null = null;
+
+      function finish() {
+        if (timer) {
+          clearTimeout(
+            timer
+          );
+        }
+
+        document.removeEventListener(
+          "visibilitychange",
+          schedule
+        );
+
+        resolve();
+      }
+
+      function schedule() {
+        if (
+          document.visibilityState !==
+          "visible"
+        ) {
+          if (timer) {
+            clearTimeout(
+              timer
+            );
+            timer = null;
+          }
+
+          return;
+        }
+
+        if (timer) {
+          return;
+        }
+
+        timer =
+          setTimeout(
+            finish,
+            HUMAN_DELAY_MS
+          );
+      }
+
+      schedule();
+
+      document.addEventListener(
+        "visibilitychange",
+        schedule
+      );
+    }
   );
 }
 
@@ -156,29 +266,92 @@ export default function SiteAnalyticsTracker() {
     usePathname();
 
   useEffect(() => {
-    if (
-      !pathname ||
-      shouldSkipPath(pathname)
-    ) {
+    if (!pathname) {
       return;
     }
 
-    let cancelled = false;
+    let cancelled =
+      false;
 
     async function trackVisit() {
       try {
         /*
-         * لا نحسب حسابات الأدمن/الأطباء المسجلين.
-         * الهدف هو قياس الزوار العامين فقط.
+         * ما نحسب localhost أو Netlify preview.
+         */
+        if (
+          isLocalOrPreview()
+        ) {
+          return;
+        }
+
+        /*
+         * نرفض أغلب crawlers / headless / automation.
+         */
+        if (
+          looksLikeBot()
+        ) {
+          return;
+        }
+
+        /*
+         * حتى بالمسارات الخاصة نفحص الجلسة:
+         * إذا الجهاز استُخدم من أدمن/طبيب نخزنه
+         * كجهاز داخلي وما نحسب زياراته العامة.
          */
         const {
           data: sessionData,
         } =
           await supabase.auth.getSession();
 
+        if (cancelled) {
+          return;
+        }
+
+        if (
+          sessionData.session?.user
+        ) {
+          localStorage.setItem(
+            INTERNAL_DEVICE_KEY,
+            "1"
+          );
+
+          return;
+        }
+
+        /*
+         * صفحات الإدارة والطبيب والتسجيل
+         * لا تدخل بالإحصائيات العامة.
+         */
+        if (
+          isPrivatePath(
+            pathname
+          )
+        ) {
+          return;
+        }
+
+        /*
+         * إذا هذا الجهاز معروف كجهاز داخلي
+         * لا نحسبه حتى لو الأدمن/الطبيب طلع من الحساب.
+         */
+        if (
+          localStorage.getItem(
+            INTERNAL_DEVICE_KEY
+          ) === "1"
+        ) {
+          return;
+        }
+
+        /*
+         * ما نسجل فتحات سريعة أو تحميلات آلية:
+         * لازم الصفحة تبقى ظاهرة 2.5 ثانية.
+         */
+        await waitForVisibleHumanPage();
+
         if (
           cancelled ||
-          sessionData.session?.user
+          document.visibilityState !==
+            "visible"
         ) {
           return;
         }
@@ -215,8 +388,8 @@ export default function SiteAnalyticsTracker() {
         }
 
         /*
-         * يمنع تسجيل نفس الصفحة بشكل متكرر
-         * بسبب Refresh سريع أو React dev mode.
+         * يمنع تكرار نفس الصفحة بسبب
+         * Refresh سريع أو React dev mode.
          */
         const dedupeKey =
           `adam-analytics:${pathname}`;
@@ -232,7 +405,7 @@ export default function SiteAnalyticsTracker() {
           lastTracked > 0 &&
           Date.now() -
             lastTracked <
-            30_000
+            60_000
         ) {
           return;
         }
@@ -252,43 +425,52 @@ export default function SiteAnalyticsTracker() {
               .timeZone ||
             "Unknown";
         } catch {
-          // لا شيء
+          // ignore
         }
 
-        await supabase.rpc(
-          "record_site_visit",
-          {
-            p_visitor_id:
-              visitorId,
-            p_session_id:
-              sessionId,
-            p_path:
-              pathname,
-            p_referrer_host:
-              getReferrerHost(),
-            p_device_type:
-              getDeviceType(),
-            p_browser_name:
-              getBrowserName(),
-            p_os_name:
-              getOsName(),
-            p_language:
-              navigator.language ||
-              "Unknown",
-            p_timezone:
-              timezone,
-            p_screen_size:
-              `${window.screen.width}x${window.screen.height}`,
-            p_is_returning:
-              Boolean(
-                existingVisitor
-              ),
-          }
-        );
+        const {
+          error: analyticsError,
+        } =
+          await supabase.rpc(
+            "record_site_visit",
+            {
+              p_visitor_id:
+                visitorId,
+              p_session_id:
+                sessionId,
+              p_path:
+                pathname,
+              p_referrer_host:
+                getReferrerHost(),
+              p_device_type:
+                getDeviceType(),
+              p_browser_name:
+                getBrowserName(),
+              p_os_name:
+                getOsName(),
+              p_language:
+                navigator.language ||
+                "Unknown",
+              p_timezone:
+                timezone,
+              p_screen_size:
+                `${window.screen.width}x${window.screen.height}`,
+              p_is_returning:
+                Boolean(
+                  existingVisitor
+                ),
+            }
+          );
+
+        if (analyticsError) {
+          console.debug(
+            "SITE ANALYTICS RPC:",
+            analyticsError.message
+          );
+        }
       } catch (error) {
         /*
-         * التحليلات ما لازم تعطل الموقع
-         * حتى لو صار خطأ بالاتصال.
+         * التحليلات ما لازم تعطل الموقع.
          */
         console.debug(
           "SITE ANALYTICS:",

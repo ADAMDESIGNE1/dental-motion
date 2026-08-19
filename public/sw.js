@@ -1,5 +1,5 @@
 const CACHE_NAME =
-  "adam-design-pwa-v1";
+  "adam-design-pwa-v2";
 
 const STATIC_ASSETS = [
   "/admin-app.webmanifest",

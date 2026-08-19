@@ -1,10 +1,10 @@
 {
-  "id": "/doctor-app",
+  "id": "/doctor-dashboard",
   "name": "ADAM DESIGN DOCTORS",
   "short_name": "ADAM DOCTORS",
   "description": "إدارة موقع الطبيب المشترك في ADAM DESIGN.",
   "start_url": "/doctor-dashboard",
-  "scope": "/doctor",
+  "scope": "/doctor-",
   "display": "standalone",
   "orientation": "any",
   "background_color": "#03101a",
