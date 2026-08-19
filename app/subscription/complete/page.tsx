@@ -3,6 +3,7 @@
 import {
   ChangeEvent,
   FormEvent,
+  Suspense,
   useEffect,
   useState,
 } from "react";
@@ -19,7 +20,7 @@ const PLAN_DURATION_DAYS: Record<string, number> = {
   premium: 30,
 };
 
-export default function SubscriptionCompletePage() {
+function SubscriptionCompleteContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -636,6 +637,20 @@ export default function SubscriptionCompletePage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function SubscriptionCompletePage() {
+  return (
+    <Suspense
+      fallback={
+        <main style={loadingStyle} dir="rtl">
+          جاري تحميل صفحة الاشتراك...
+        </main>
+      }
+    >
+      <SubscriptionCompleteContent />
+    </Suspense>
   );
 }
 

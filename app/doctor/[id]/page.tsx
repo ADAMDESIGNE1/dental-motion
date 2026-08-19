@@ -890,7 +890,7 @@ export default function DoctorPage() {
     return value;
   }
 
-  function openWhatsApp() {
+  function openWhatsApp() {if (!doctor) return;
     const raw =
       isPortfolioDoctor
         ? "07803447144"
