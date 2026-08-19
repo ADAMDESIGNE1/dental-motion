@@ -11,6 +11,24 @@ type Doctor = {
   image: string;
 };
 
+type SavedDoctor = {
+  id: string;
+  name: string;
+  specialty: string;
+  image: string;
+  url: string;
+};
+
+type FeaturedDoctor = {
+  id: string;
+  slug: string | null;
+  full_name: string | null;
+  specialty: string | null;
+  profile_image: string | null;
+  clinic_name: string | null;
+  featured_until: string | null;
+};
+
 const doctors: Doctor[] = [
   {
     id: "doctor1",
@@ -101,6 +119,8 @@ const subscriptionPlans = [
       "الاختصاص والخبرة",
       "معلومات التواصل",
       "نبذة مهنية عن الطبيب",
+      "موقع العيادة وأوقات الدوام",
+      "روابط Instagram / TikTok / Facebook",
       "عرض حالات قبل وبعد (حالتان فقط)",
     ],
   },
@@ -118,6 +138,15 @@ const subscriptionPlans = [
       "حتى 150 حالة Before / After",
       "عرض الشهادات والمؤهلات",
       "عرض الخدمات والتخصصات",
+      "Before / After بالسحب التفاعلي",
+      "آراء المرضى وتقييم النجوم",
+      "زر حجز WhatsApp ثابت بالموبايل",
+      "QR خاص بموقع الطبيب",
+      "إحصائيات الزيارات وضغطات WhatsApp",
+      "بحث وفلترة الحالات حسب النوع",
+      "إحصائيات طلبات المواعيد والخدمات",
+      "SEO ومشاركة احترافية لمحركات البحث",
+      "3 Themes للموقع: Dark Blue / Black & Gold / Clean White",
       "واجهة احترافية للطبيب",
       "مساحة أكبر لأعمال قبل وبعد",
       "ملف طبي أكثر تفصيلاً",
@@ -141,6 +170,10 @@ export default function HomePage() {
   const router = useRouter();
   const [canSeeAdmin, setCanSeeAdmin] =
     useState(false);
+  const [savedDoctors, setSavedDoctors] =
+    useState<SavedDoctor[]>([]);
+  const [featuredDoctors, setFeaturedDoctors] =
+    useState<FeaturedDoctor[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -196,6 +229,122 @@ export default function HomePage() {
     return () => {
       mounted = false;
       authListener.subscription.unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadFeaturedDoctors() {
+      const now =
+        new Date().toISOString();
+
+      const {
+        data,
+        error,
+      } =
+        await supabase
+          .from("doctors")
+          .select(
+            "id,slug,full_name,specialty,profile_image,clinic_name,featured_until"
+          )
+          .eq(
+            "featured_active",
+            true
+          )
+          .eq(
+            "subscription_active",
+            true
+          )
+          .eq(
+            "is_approved",
+            true
+          )
+          .gt(
+            "featured_until",
+            now
+          )
+          .gt(
+            "subscription_expires_at",
+            now
+          )
+          .order(
+            "featured_until",
+            {
+              ascending: true,
+            }
+          )
+          .limit(12);
+
+      if (!mounted) return;
+
+      if (error) {
+        console.error(
+          "LOAD FEATURED DOCTORS:",
+          error
+        );
+        setFeaturedDoctors([]);
+        return;
+      }
+
+      setFeaturedDoctors(
+        (data ||
+          []) as FeaturedDoctor[]
+      );
+    }
+
+    void loadFeaturedDoctors();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    function loadSavedDoctors() {
+      try {
+        const raw =
+          localStorage.getItem(
+            "saved-doctors"
+          );
+
+        const parsed =
+          raw
+            ? JSON.parse(raw)
+            : [];
+
+        setSavedDoctors(
+          Array.isArray(parsed)
+            ? parsed.filter(
+                (
+                  item: unknown
+                ): item is SavedDoctor =>
+                  Boolean(
+                    item &&
+                      typeof item === "object" &&
+                      "id" in item &&
+                      "url" in item
+                  )
+              )
+            : []
+        );
+      } catch {
+        setSavedDoctors([]);
+      }
+    }
+
+    loadSavedDoctors();
+
+    window.addEventListener(
+      "storage",
+      loadSavedDoctors
+    );
+
+    return () => {
+      window.removeEventListener(
+        "storage",
+        loadSavedDoctors
+      );
     };
   }, []);
 
@@ -406,6 +555,336 @@ export default function HomePage() {
 
       </section>
 
+      {savedDoctors.length > 0 && (
+        <section
+          dir="rtl"
+          style={{
+            position: "relative",
+            zIndex: 2,
+            maxWidth: 1180,
+            margin: "0 auto",
+            padding: "0 24px 42px",
+          }}
+        >
+          <div
+            style={{
+              padding: 20,
+              background:
+                "rgba(0,10,20,.46)",
+              border:
+                "1px solid rgba(50,186,255,.16)",
+            }}
+          >
+            <span
+              className="hero-small-label"
+            >
+              محفوظاتك
+            </span>
+
+            <h2
+              style={{
+                margin: "8px 0 14px",
+                color: "#fff",
+                fontSize: 28,
+              }}
+            >
+              أطباء حفظتهم على هذا الجهاز
+            </h2>
+
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(210px,1fr))",
+                gap: 10,
+              }}
+            >
+              {savedDoctors.map(
+                (doctor) => (
+                  <button
+                    key={doctor.id}
+                    type="button"
+                    onClick={() =>
+                      window.location.assign(
+                        doctor.url
+                      )
+                    }
+                    style={{
+                      display: "grid",
+                      gridTemplateColumns:
+                        "58px minmax(0,1fr)",
+                      gap: 10,
+                      alignItems: "center",
+                      padding: 10,
+                      textAlign: "right",
+                      cursor: "pointer",
+                      color: "#fff",
+                      background:
+                        "rgba(255,255,255,.025)",
+                      border:
+                        "1px solid rgba(255,255,255,.07)",
+                    }}
+                  >
+                    <img
+                      src={
+                        doctor.image ||
+                        "/logo.png"
+                      }
+                      alt={doctor.name}
+                      style={{
+                        width: 58,
+                        height: 58,
+                        objectFit: "cover",
+                        borderRadius: "50%",
+                        border:
+                          "1px solid rgba(50,186,255,.18)",
+                      }}
+                    />
+
+                    <span>
+                      <strong
+                        style={{
+                          display: "block",
+                          fontSize: 11,
+                        }}
+                      >
+                        {doctor.name}
+                      </strong>
+
+                      <small
+                        style={{
+                          display: "block",
+                          marginTop: 4,
+                          color:
+                            "rgba(255,255,255,.45)",
+                          fontSize: 9,
+                        }}
+                      >
+                        {doctor.specialty}
+                      </small>
+                    </span>
+                  </button>
+                )
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+
+      {featuredDoctors.length > 0 && (
+        <section
+          dir="rtl"
+          style={{
+            position: "relative",
+            zIndex: 2,
+            maxWidth: 1180,
+            margin: "0 auto 52px",
+            padding: "0 24px",
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              gap: 18,
+              alignItems: "flex-end",
+              flexWrap: "wrap",
+              marginBottom: 18,
+            }}
+          >
+            <div>
+              <span
+                className="hero-small-label"
+                style={{
+                  color: "#ffbf69",
+                }}
+              >
+                FEATURED DOCTORS
+              </span>
+
+              <h2
+                style={{
+                  margin: "8px 0 0",
+                  color: "#fff",
+                  fontFamily: "Georgia, serif",
+                  fontSize: "clamp(30px,4vw,46px)",
+                  fontWeight: 400,
+                }}
+              >
+                أطباء مميزون
+              </h2>
+            </div>
+
+            <p
+              style={{
+                maxWidth: 520,
+                margin: 0,
+                color: "rgba(255,255,255,.42)",
+                fontSize: 11,
+                lineHeight: 1.9,
+              }}
+            >
+              أطباء باشتراك فعال اختاروا ظهوراً مميزاً داخل المنصة.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit,minmax(240px,300px))",
+              justifyContent: "start",
+              gap: 14,
+            }}
+          >
+            {featuredDoctors.map(
+              (doctor) => (
+                <button
+                  key={doctor.id}
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      `/doctor/${
+                        doctor.slug ||
+                        doctor.id
+                      }`
+                    )
+                  }
+                  style={{
+                    position: "relative",
+                    overflow: "hidden",
+                    width: "100%",
+                    maxWidth: 300,
+                    minHeight: 315,
+                    padding: 0,
+                    textAlign: "right",
+                    color: "#fff",
+                    cursor: "pointer",
+                    border:
+                      "1px solid rgba(255,191,105,.34)",
+                    background:
+                      "linear-gradient(145deg,rgba(255,191,105,.08),rgba(2,7,17,.96))",
+                    boxShadow:
+                      "0 20px 55px rgba(0,0,0,.24)",
+                  }}
+                >
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 12,
+                      left: 12,
+                      zIndex: 3,
+                      padding: "7px 9px",
+                      color: "#160f05",
+                      background: "#ffbf69",
+                      fontSize: 8,
+                      fontWeight: 900,
+                      letterSpacing: ".12em",
+                    }}
+                  >
+                    ★ FEATURED
+                  </div>
+
+                  <div
+                    style={{
+                      height: 185,
+                      overflow: "hidden",
+                      background:
+                        "rgba(255,255,255,.025)",
+                    }}
+                  >
+                    {doctor.profile_image ? (
+                      <img
+                        src={doctor.profile_image}
+                        alt={
+                          doctor.full_name ||
+                          "Featured doctor"
+                        }
+                        style={{
+                          width: "100%",
+                          height: "100%",
+                          objectFit: "cover",
+                          display: "block",
+                        }}
+                      />
+                    ) : (
+                      <div
+                        style={{
+                          height: "100%",
+                          display: "grid",
+                          placeItems: "center",
+                          color:
+                            "rgba(255,255,255,.18)",
+                          fontSize: 40,
+                        }}
+                      >
+                        DR
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      padding: 16,
+                    }}
+                  >
+                    <strong
+                      style={{
+                        display: "block",
+                        color: "#fff",
+                        fontSize: 15,
+                      }}
+                    >
+                      د.{" "}
+                      {doctor.full_name ||
+                        "طبيب"}
+                    </strong>
+
+                    <span
+                      style={{
+                        display: "block",
+                        marginTop: 5,
+                        color: "#ffbf69",
+                        fontSize: 9,
+                      }}
+                    >
+                      {doctor.specialty ||
+                        "Dental Doctor"}
+                    </span>
+
+                    {doctor.clinic_name && (
+                      <small
+                        style={{
+                          display: "block",
+                          marginTop: 8,
+                          color:
+                            "rgba(255,255,255,.38)",
+                          fontSize: 8,
+                        }}
+                      >
+                        {doctor.clinic_name}
+                      </small>
+                    )}
+
+                    <span
+                      style={{
+                        display: "inline-block",
+                        marginTop: 12,
+                        color:
+                          "rgba(255,255,255,.58)",
+                        fontSize: 9,
+                      }}
+                    >
+                      عرض موقع الطبيب ↗
+                    </span>
+                  </div>
+                </button>
+              )
+            )}
+          </div>
+        </section>
+      )}
 
       {/* =====================================================
           DOCTORS
@@ -762,6 +1241,43 @@ export default function HomePage() {
                     </b>
 
                   </div>
+
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+
+                      router.push(
+                        plan.id === "premium"
+                          ? "/demo-premium"
+                          : "/demo-basic"
+                      );
+                    }}
+                    onKeyDown={(event) => {
+                      event.stopPropagation();
+                    }}
+                    style={{
+                      width: "100%",
+                      marginTop: 12,
+                      padding: "12px 14px",
+                      border:
+                        plan.id === "premium"
+                          ? "1px solid rgba(199,168,93,.35)"
+                          : "1px solid rgba(50,186,255,.28)",
+                      background:
+                        plan.id === "premium"
+                          ? "rgba(199,168,93,.07)"
+                          : "rgba(50,186,255,.055)",
+                      color: "#fff",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      fontWeight: 700,
+                    }}
+                  >
+                    {plan.id === "premium"
+                      ? "شاهد نموذج الباقة المميزة"
+                      : "شاهد نموذج الباقة العادية"}
+                  </button>
 
                 </div>
 

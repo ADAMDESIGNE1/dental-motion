@@ -43,6 +43,8 @@ const plans: Record<Plan, PlanDetails> = {
       "الاختصاص والخبرة",
       "معلومات التواصل",
       "نبذة مهنية عن الطبيب",
+      "موقع العيادة وأوقات الدوام",
+      "روابط Instagram / TikTok / Facebook",
       "حالات Before / After",
     ],
   },
@@ -59,6 +61,15 @@ const plans: Record<Plan, PlanDetails> = {
       "حتى 150 حالة Before / After",
       "عرض الشهادات والمؤهلات",
       "عرض الخدمات والتخصصات",
+      "Before / After بالسحب التفاعلي",
+      "آراء المرضى وتقييم النجوم",
+      "زر حجز WhatsApp ثابت بالموبايل",
+      "QR خاص بموقع الطبيب",
+      "إحصائيات الزيارات وضغطات WhatsApp",
+      "بحث وفلترة الحالات حسب النوع",
+      "إحصائيات طلبات المواعيد والخدمات",
+      "SEO ومشاركة احترافية لمحركات البحث",
+      "3 Themes للموقع: Dark Blue / Black & Gold / Clean White",
       "واجهة احترافية للطبيب",
       "مساحة أكبر للأعمال",
       "ملف طبي أكثر تفصيلاً",
@@ -704,6 +715,116 @@ ${requestId}
                 </div>
               )
             )}
+          </div>
+
+          <button
+            type="button"
+            onClick={() =>
+              window.location.assign(
+                plan === "premium"
+                  ? "/demo-premium"
+                  : "/demo-basic"
+              )
+            }
+            style={{
+              marginTop: 16,
+              padding: "11px 14px",
+              border:
+                plan === "premium"
+                  ? "1px solid rgba(199,168,93,.28)"
+                  : "1px solid rgba(50,186,255,.24)",
+              background:
+                plan === "premium"
+                  ? "rgba(199,168,93,.06)"
+                  : "rgba(50,186,255,.05)",
+              color: "#fff",
+              cursor: "pointer",
+              fontSize: 11,
+              fontWeight: 700,
+            }}
+          >
+            {plan === "premium"
+              ? "شاهد نموذج الباقة المميزة قبل الدفع ↗"
+              : "شاهد نموذج الباقة العادية قبل الدفع ↗"}
+          </button>
+        </section>
+
+        <section
+          style={{
+            ...section,
+            border:
+              "1px solid rgba(255,191,105,.22)",
+            background:
+              "linear-gradient(145deg,rgba(255,191,105,.055),rgba(2,7,14,.94))",
+          }}
+        >
+          <div
+            style={{
+              ...sectionLabel,
+              color: "#ffbf69",
+            }}
+          >
+            OPTIONAL ADD-ON
+          </div>
+
+          <h2 style={sectionTitle}>
+            ⭐ Featured Doctor
+          </h2>
+
+          <p style={muted}>
+            إضافة اختيارية بعد تفعيل اشتراكك. تخلي بطاقة طبيبك
+            تظهر بأعلى الصفحة الرئيسية مع شارة Featured وظهور أقوى.
+          </p>
+
+          <div
+            style={{
+              display: "flex",
+              justifyContent:
+                "space-between",
+              gap: 16,
+              alignItems:
+                "center",
+              flexWrap: "wrap",
+              marginTop: 16,
+              padding: 14,
+              border:
+                "1px solid rgba(255,191,105,.16)",
+              background:
+                "rgba(255,191,105,.035)",
+            }}
+          >
+            <div>
+              <strong
+                style={{
+                  display: "block",
+                  color: "#fff",
+                  fontSize: 16,
+                }}
+              >
+                30 يوم Featured
+              </strong>
+
+              <small
+                style={{
+                  display: "block",
+                  marginTop: 5,
+                  color:
+                    "rgba(255,255,255,.42)",
+                }}
+              >
+                تطلبه من لوحة الطبيب بعد تفعيل الاشتراك.
+              </small>
+            </div>
+
+            <div
+              style={{
+                color: "#ffbf69",
+                fontSize: 24,
+                fontWeight: 800,
+              }}
+            >
+              75,000 د.ع
+            </div>
           </div>
         </section>
 

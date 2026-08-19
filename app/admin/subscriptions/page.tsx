@@ -15,6 +15,30 @@ type PaymentMethod =
   | "kcard"
   | "zaincash";
 
+type AdminDoctorSummary = {
+  id: string;
+  full_name: string | null;
+  slug: string | null;
+  specialty: string | null;
+  profile_image: string | null;
+  subscription_plan: string | null;
+  subscription_active: boolean | null;
+  subscription_expires_at: string | null;
+  is_approved: boolean | null;
+  featured_active: boolean | null;
+  featured_started_at: string | null;
+  featured_until: string | null;
+};
+
+type FeaturedSale = {
+  id: string;
+  doctor_id: string;
+  amount_iqd: number;
+  starts_at: string;
+  ends_at: string;
+  created_at: string;
+};
+
 type SubscriptionRequest = {
   id: string;
   doctor_id: string | null;
@@ -55,6 +79,13 @@ export default function AdminSubscriptionsPage() {
   const [requests, setRequests] = useState<
     SubscriptionRequest[]
   >([]);
+
+  const [doctorsSummary, setDoctorsSummary] =
+    useState<AdminDoctorSummary[]>([]);
+  const [featuredSales, setFeaturedSales] =
+    useState<FeaturedSale[]>([]);
+  const [featuredSavingId, setFeaturedSavingId] =
+    useState<string | null>(null);
 
   const [loading, setLoading] =
     useState(true);
@@ -147,6 +178,7 @@ export default function AdminSubscriptionsPage() {
           setCurrentUser(null);
           setCurrentEmail(null);
           setRequests([]);
+          setDoctorsSummary([]);
 
           throw new Error(
             "لا توجد جلسة دخول. سجّل دخول حساب الأدمن أولاً."
@@ -162,6 +194,7 @@ export default function AdminSubscriptionsPage() {
           setCurrentUser(null);
           setCurrentEmail(null);
           setRequests([]);
+          setDoctorsSummary([]);
 
           setError(
             "الحساب الحالي ليس حساب أدمن. سجّل دخول حساب الأدمن."
@@ -249,6 +282,63 @@ export default function AdminSubscriptionsPage() {
           (data ||
             []) as SubscriptionRequest[]
         );
+
+        const {
+          data: doctorsData,
+          error: doctorsError,
+        } = await supabase
+          .from("doctors")
+          .select(
+            "id,full_name,slug,specialty,profile_image,subscription_plan,subscription_active,subscription_expires_at,is_approved,featured_active,featured_started_at,featured_until"
+          )
+          .order(
+            "subscription_expires_at",
+            {
+              ascending: true,
+            }
+          );
+
+        if (doctorsError) {
+          console.error(
+            "LOAD ADMIN DOCTORS SUMMARY:",
+            doctorsError
+          );
+          setDoctorsSummary([]);
+        } else {
+          setDoctorsSummary(
+            (doctorsData ||
+              []) as AdminDoctorSummary[]
+          );
+        }
+
+        const {
+          data: featuredSalesData,
+          error: featuredSalesError,
+        } =
+          await supabase
+            .from("featured_sales")
+            .select(
+              "id,doctor_id,amount_iqd,starts_at,ends_at,created_at"
+            )
+            .order(
+              "created_at",
+              {
+                ascending: false,
+              }
+            );
+
+        if (featuredSalesError) {
+          console.error(
+            "LOAD FEATURED SALES:",
+            featuredSalesError
+          );
+          setFeaturedSales([]);
+        } else {
+          setFeaturedSales(
+            (featuredSalesData ||
+              []) as FeaturedSale[]
+          );
+        }
       } catch (err) {
         console.error(
           "LOAD REQUESTS ERROR:",
@@ -256,6 +346,7 @@ export default function AdminSubscriptionsPage() {
         );
 
         setRequests([]);
+        setDoctorsSummary([]);
 
         setError(
           err instanceof Error
@@ -939,6 +1030,80 @@ export default function AdminSubscriptionsPage() {
     );
   }
 
+  async function changeFeaturedDoctor(
+    doctor: AdminDoctorSummary,
+    action:
+      | "activate"
+      | "disable"
+  ) {
+    const confirmed =
+      window.confirm(
+        action === "activate"
+          ? `تفعيل/تمديد Featured للدكتور ${
+              doctor.full_name ||
+              "الطبيب"
+            } لمدة 30 يوم مقابل 75,000 د.ع؟`
+          : `إيقاف Featured للدكتور ${
+              doctor.full_name ||
+              "الطبيب"
+            }؟`
+      );
+
+    if (!confirmed) return;
+
+    setFeaturedSavingId(
+      doctor.id
+    );
+    setError("");
+    setMessage("");
+
+    try {
+      const {
+        data,
+        error: rpcError,
+      } =
+        await supabase.rpc(
+          "set_doctor_featured",
+          {
+            p_doctor_id:
+              doctor.id,
+            p_action:
+              action,
+          }
+        );
+
+      if (rpcError) {
+        throw new Error(
+          rpcError.message
+        );
+      }
+
+      if (data !== true) {
+        throw new Error(
+          "لم يتم تحديث حالة Featured."
+        );
+      }
+
+      setMessage(
+        action === "activate"
+          ? "تم تفعيل/تمديد Featured لمدة 30 يوم وتسجيل 75,000 د.ع."
+          : "تم إيقاف Featured."
+      );
+
+      await loadRequests();
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "تعذر تحديث Featured."
+      );
+    } finally {
+      setFeaturedSavingId(
+        null
+      );
+    }
+  }
+
   /*
    * =====================================================
    * FORMAT DATE
@@ -1017,6 +1182,122 @@ export default function AdminSubscriptionsPage() {
         item.status ===
         "rejected"
     ).length;
+
+  const nowTime =
+    Date.now();
+
+  const activeDoctors =
+    doctorsSummary.filter(
+      (doctor) => {
+        const expiry =
+          doctor.subscription_expires_at
+            ? new Date(
+                doctor.subscription_expires_at
+              ).getTime()
+            : 0;
+
+        return (
+          doctor.subscription_active ===
+            true &&
+          doctor.is_approved === true &&
+          expiry > nowTime
+        );
+      }
+    );
+
+  const activePremiumCount =
+    activeDoctors.filter(
+      (doctor) =>
+        (
+          doctor.subscription_plan ||
+          ""
+        ).toLowerCase() ===
+        "premium"
+    ).length;
+
+  const activeBasicCount =
+    activeDoctors.filter(
+      (doctor) =>
+        (
+          doctor.subscription_plan ||
+          "basic"
+        ).toLowerCase() !==
+        "premium"
+    ).length;
+
+  const activeFeaturedDoctors =
+    activeDoctors.filter(
+      (doctor) => {
+        const featuredUntil =
+          doctor.featured_until
+            ? new Date(
+                doctor.featured_until
+              ).getTime()
+            : 0;
+
+        return (
+          doctor.featured_active ===
+            true &&
+          featuredUntil >
+            nowTime
+        );
+      }
+    );
+
+  const featuredRevenue =
+    featuredSales.reduce(
+      (
+        total,
+        sale
+      ) =>
+        total +
+        Number(
+          sale.amount_iqd ||
+            0
+        ),
+      0
+    );
+
+  const expiringSoonDoctors =
+    activeDoctors
+      .filter((doctor) => {
+        const expiry =
+          doctor.subscription_expires_at
+            ? new Date(
+                doctor.subscription_expires_at
+              ).getTime()
+            : 0;
+
+        const days =
+          Math.ceil(
+            (
+              expiry -
+              nowTime
+            ) /
+              86_400_000
+          );
+
+        return (
+          days >= 0 &&
+          days <= 7
+        );
+      })
+      .sort((a, b) => {
+        const aTime =
+          a.subscription_expires_at
+            ? new Date(
+                a.subscription_expires_at
+              ).getTime()
+            : 0;
+        const bTime =
+          b.subscription_expires_at
+            ? new Date(
+                b.subscription_expires_at
+              ).getTime()
+            : 0;
+
+        return aTime - bTime;
+      });
 
   /*
    * =====================================================
@@ -1275,6 +1556,26 @@ export default function AdminSubscriptionsPage() {
           >
             <button
               type="button"
+              onClick={() =>
+                router.push(
+                  "/admin/analytics"
+                )
+              }
+              style={{
+                ...refreshButton,
+                border:
+                  "1px solid rgba(50,186,255,.26)",
+                color:
+                  "#8fdcff",
+                background:
+                  "rgba(50,186,255,.055)",
+              }}
+            >
+              إحصائيات الزوار
+            </button>
+
+            <button
+              type="button"
               onClick={
                 loadRequests
               }
@@ -1360,6 +1661,509 @@ export default function AdminSubscriptionsPage() {
               rejectedCount
             }
           />
+        </section>
+
+        <section
+          style={{
+            ...panelStyle,
+            marginBottom: 22,
+          }}
+        >
+          <div
+            style={
+              panelHeader
+            }
+          >
+            <div>
+              <div
+                style={
+                  sectionLabel
+                }
+              >
+                PLATFORM OVERVIEW
+              </div>
+
+              <h2
+                style={
+                  sectionTitle
+                }
+              >
+                ملخص المنصة
+              </h2>
+            </div>
+
+            <div
+              style={
+                countBadge
+              }
+            >
+              {activeDoctors.length} مشترك فعال
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                "repeat(auto-fit,minmax(160px,1fr))",
+              gap: 12,
+            }}
+          >
+            <Stat
+              title="المشتركون الفعالون"
+              value={
+                activeDoctors.length
+              }
+            />
+
+            <Stat
+              title="Premium"
+              value={
+                activePremiumCount
+              }
+            />
+
+            <Stat
+              title="Basic"
+              value={
+                activeBasicCount
+              }
+            />
+
+            <Stat
+              title="ينتهون خلال 7 أيام"
+              value={
+                expiringSoonDoctors.length
+              }
+            />
+
+            <Stat
+              title="Featured فعال"
+              value={
+                activeFeaturedDoctors.length
+              }
+            />
+
+            <Stat
+              title="إيراد Featured"
+              value={
+                featuredRevenue
+              }
+            />
+
+            <Stat
+              title="طلبات معلقة"
+              value={
+                pendingCount
+              }
+            />
+          </div>
+
+          {expiringSoonDoctors.length >
+            0 && (
+            <div
+              style={{
+                marginTop: 18,
+                padding: 16,
+                border:
+                  "1px solid rgba(255,184,77,.22)",
+                background:
+                  "rgba(255,184,77,.04)",
+              }}
+            >
+              <strong
+                style={{
+                  display: "block",
+                  marginBottom: 10,
+                  color: "#ffbf69",
+                }}
+              >
+                اشتراكات قريبة من الانتهاء
+              </strong>
+
+              <div
+                style={{
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
+                {expiringSoonDoctors.map(
+                  (doctor) => {
+                    const days =
+                      doctor.subscription_expires_at
+                        ? Math.max(
+                            0,
+                            Math.ceil(
+                              (
+                                new Date(
+                                  doctor.subscription_expires_at
+                                ).getTime() -
+                                nowTime
+                              ) /
+                                86_400_000
+                            )
+                          )
+                        : 0;
+
+                    return (
+                      <div
+                        key={doctor.id}
+                        style={{
+                          display: "flex",
+                          justifyContent:
+                            "space-between",
+                          gap: 12,
+                          flexWrap: "wrap",
+                          padding:
+                            "10px 12px",
+                          border:
+                            "1px solid rgba(255,255,255,.06)",
+                          background:
+                            "rgba(255,255,255,.02)",
+                        }}
+                      >
+                        <span>
+                          {doctor.full_name ||
+                            "طبيب"}
+                        </span>
+
+                        <strong
+                          style={{
+                            color:
+                              days <= 2
+                                ? "#ff8585"
+                                : "#ffbf69",
+                          }}
+                        >
+                          باقي {days} يوم
+                        </strong>
+                      </div>
+                    );
+                  }
+                )}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section
+          style={{
+            ...panelStyle,
+            marginBottom: 22,
+            border:
+              "1px solid rgba(255,191,105,.20)",
+            background:
+              "linear-gradient(145deg,rgba(255,191,105,.045),rgba(1,6,14,.82))",
+          }}
+        >
+          <div style={panelHeader}>
+            <div>
+              <div style={sectionLabel}>
+                FEATURED DOCTORS
+              </div>
+
+              <h2 style={sectionTitle}>
+                إدارة الظهور المميز
+              </h2>
+
+              <p
+                style={{
+                  margin: "8px 0 0",
+                  color:
+                    "rgba(255,255,255,.42)",
+                  fontSize: 10,
+                  lineHeight: 1.8,
+                }}
+              >
+                السعر: 75,000 د.ع لكل 30 يوم. التفعيل أو التمديد يسجل عملية بيع تلقائياً.
+              </p>
+            </div>
+
+            <div
+              style={{
+                ...countBadge,
+                color: "#ffbf69",
+                border:
+                  "1px solid rgba(255,191,105,.22)",
+                background:
+                  "rgba(255,191,105,.04)",
+              }}
+            >
+              {activeFeaturedDoctors.length} Featured فعال
+            </div>
+          </div>
+
+          {activeDoctors.length ===
+          0 ? (
+            <div
+              style={{
+                padding: 18,
+                color:
+                  "rgba(255,255,255,.4)",
+                border:
+                  "1px dashed rgba(255,255,255,.08)",
+              }}
+            >
+              ماكو مشتركين فعالين حالياً.
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit,minmax(260px,1fr))",
+                gap: 10,
+              }}
+            >
+              {activeDoctors.map(
+                (doctor) => {
+                  const featuredUntil =
+                    doctor.featured_until
+                      ? new Date(
+                          doctor.featured_until
+                        ).getTime()
+                      : 0;
+
+                  const featuredNow =
+                    doctor.featured_active ===
+                      true &&
+                    featuredUntil >
+                      nowTime;
+
+                  const featuredDays =
+                    featuredNow
+                      ? Math.max(
+                          1,
+                          Math.ceil(
+                            (
+                              featuredUntil -
+                              nowTime
+                            ) /
+                              86_400_000
+                          )
+                        )
+                      : 0;
+
+                  return (
+                    <article
+                      key={doctor.id}
+                      style={{
+                        padding: 15,
+                        border:
+                          featuredNow
+                            ? "1px solid rgba(255,191,105,.28)"
+                            : "1px solid rgba(255,255,255,.07)",
+                        background:
+                          featuredNow
+                            ? "rgba(255,191,105,.045)"
+                            : "rgba(255,255,255,.02)",
+                      }}
+                    >
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 10,
+                          alignItems: "center",
+                        }}
+                      >
+                        {doctor.profile_image ? (
+                          <img
+                            src={doctor.profile_image}
+                            alt={
+                              doctor.full_name ||
+                              "Doctor"
+                            }
+                            style={{
+                              width: 52,
+                              height: 52,
+                              objectFit: "cover",
+                              borderRadius: "50%",
+                              border:
+                                "1px solid rgba(255,255,255,.10)",
+                            }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: 52,
+                              height: 52,
+                              display: "grid",
+                              placeItems: "center",
+                              borderRadius: "50%",
+                              color:
+                                "rgba(255,255,255,.35)",
+                              border:
+                                "1px solid rgba(255,255,255,.10)",
+                            }}
+                          >
+                            DR
+                          </div>
+                        )}
+
+                        <div>
+                          <strong
+                            style={{
+                              display: "block",
+                              color: "#fff",
+                            }}
+                          >
+                            {doctor.full_name ||
+                              "طبيب"}
+                          </strong>
+
+                          <small
+                            style={{
+                              display: "block",
+                              marginTop: 4,
+                              color:
+                                "rgba(255,255,255,.38)",
+                            }}
+                          >
+                            {(
+                              doctor.subscription_plan ||
+                              "basic"
+                            ).toUpperCase()}
+                          </small>
+                        </div>
+                      </div>
+
+                      <div
+                        style={{
+                          marginTop: 12,
+                          padding: 10,
+                          color:
+                            featuredNow
+                              ? "#ffbf69"
+                              : "rgba(255,255,255,.42)",
+                          border:
+                            featuredNow
+                              ? "1px solid rgba(255,191,105,.18)"
+                              : "1px solid rgba(255,255,255,.06)",
+                          background:
+                            "rgba(0,0,0,.12)",
+                          fontSize: 10,
+                        }}
+                      >
+                        {featuredNow
+                          ? `★ Featured — باقي ${featuredDays} يوم`
+                          : "غير مفعّل"}
+                      </div>
+
+                      {featuredNow &&
+                        doctor.featured_until && (
+                        <small
+                          style={{
+                            display: "block",
+                            marginTop: 8,
+                            color:
+                              "rgba(255,255,255,.34)",
+                          }}
+                        >
+                          ينتهي:{" "}
+                          {formatDate(
+                            doctor.featured_until
+                          )}
+                        </small>
+                      )}
+
+                      <div
+                        style={{
+                          display: "flex",
+                          gap: 8,
+                          flexWrap: "wrap",
+                          marginTop: 12,
+                        }}
+                      >
+                        <button
+                          type="button"
+                          disabled={
+                            featuredSavingId ===
+                            doctor.id
+                          }
+                          onClick={() =>
+                            changeFeaturedDoctor(
+                              doctor,
+                              "activate"
+                            )
+                          }
+                          style={{
+                            padding: "10px 12px",
+                            color: "#160f05",
+                            background: "#ffbf69",
+                            border:
+                              "1px solid #ffbf69",
+                            cursor:
+                              featuredSavingId ===
+                              doctor.id
+                                ? "wait"
+                                : "pointer",
+                            fontWeight: 800,
+                          }}
+                        >
+                          {featuredSavingId ===
+                          doctor.id
+                            ? "جاري..."
+                            : featuredNow
+                              ? "تمديد +30 يوم"
+                              : "تفعيل 30 يوم"}
+                        </button>
+
+                        {featuredNow && (
+                          <button
+                            type="button"
+                            disabled={
+                              featuredSavingId ===
+                              doctor.id
+                            }
+                            onClick={() =>
+                              changeFeaturedDoctor(
+                                doctor,
+                                "disable"
+                              )
+                            }
+                            style={{
+                              padding: "10px 12px",
+                              color: "#ff9b9b",
+                              background:
+                                "rgba(255,80,80,.04)",
+                              border:
+                                "1px solid rgba(255,100,100,.18)",
+                              cursor: "pointer",
+                            }}
+                          >
+                            إيقاف
+                          </button>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() =>
+                            window.open(
+                              `/doctor/${
+                                doctor.slug ||
+                                doctor.id
+                              }`,
+                              "_blank"
+                            )
+                          }
+                          style={{
+                            padding: "10px 12px",
+                            color: "#fff",
+                            background: "transparent",
+                            border:
+                              "1px solid rgba(255,255,255,.09)",
+                            cursor: "pointer",
+                          }}
+                        >
+                          عرض الموقع
+                        </button>
+                      </div>
+                    </article>
+                  );
+                }
+              )}
+            </div>
+          )}
         </section>
 
         {/* CONTENT */}
