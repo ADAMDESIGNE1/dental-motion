@@ -92,6 +92,28 @@ export default function AdminSubscriptionsPage() {
   const [checkingAuth, setCheckingAuth] =
     useState(true);
 
+  async function isAdminUser(
+    userId: string
+  ) {
+    const {
+      data,
+      error: adminError,
+    } = await supabase
+      .from("admin_users")
+      .select("user_id")
+      .eq("user_id", userId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (adminError) {
+      throw new Error(
+        `تعذر التحقق من صلاحية الأدمن: ${adminError.message}`
+      );
+    }
+
+    return Boolean(data);
+  }
+
   /*
    * =====================================================
    * AUTH + LOAD REQUESTS
@@ -132,6 +154,21 @@ export default function AdminSubscriptionsPage() {
         }
 
         const user = session.user;
+
+        const allowed =
+          await isAdminUser(user.id);
+
+        if (!allowed) {
+          setCurrentUser(null);
+          setCurrentEmail(null);
+          setRequests([]);
+
+          setError(
+            "الحساب الحالي ليس حساب أدمن. سجّل دخول حساب الأدمن."
+          );
+
+          return;
+        }
 
         setCurrentUser(user.id);
         setCurrentEmail(
@@ -264,6 +301,25 @@ export default function AdminSubscriptionsPage() {
         }
 
         if (data.session?.user) {
+          const allowed =
+            await isAdminUser(
+              data.session.user.id
+            );
+
+          if (!allowed) {
+            await supabase.auth.signOut();
+
+            setCurrentUser(null);
+            setCurrentEmail(null);
+            setRequests([]);
+
+            setMessage(
+              "تم تسجيل خروج حساب الطبيب. الآن سجّل دخول حساب الأدمن."
+            );
+
+            return;
+          }
+
           setCurrentUser(
             data.session.user.id
           );
@@ -323,6 +379,19 @@ export default function AdminSubscriptionsPage() {
           if (
             session?.user
           ) {
+            const allowed =
+              await isAdminUser(
+                session.user.id
+              );
+
+            if (!allowed) {
+              setCurrentUser(null);
+              setCurrentEmail(null);
+              setRequests([]);
+
+              return;
+            }
+
             setCurrentUser(
               session.user.id
             );
@@ -410,6 +479,23 @@ export default function AdminSubscriptionsPage() {
       if (!data.session?.user) {
         throw new Error(
           "تمت محاولة تسجيل الدخول لكن لم يتم إنشاء جلسة."
+        );
+      }
+
+      const allowed =
+        await isAdminUser(
+          data.session.user.id
+        );
+
+      if (!allowed) {
+        await supabase.auth.signOut();
+
+        setCurrentUser(null);
+        setCurrentEmail(null);
+        setRequests([]);
+
+        throw new Error(
+          "هذا الحساب ليس حساب أدمن. استخدم إيميل وكلمة سر الأدمن."
         );
       }
 
@@ -805,13 +891,18 @@ export default function AdminSubscriptionsPage() {
         ? `د. ${request.doctor_name}`
         : "دكتور";
 
+    const loginUrl =
+      `${window.location.origin}/doctor-login`;
+
     const text =
       `مرحباً ${doctorName} 🌷\n\n` +
       `تمت الموافقة على طلب اشتراكك في ADAM DESIGN ✅\n\n` +
-      `يمكنك الآن إنشاء حسابك وإكمال معلومات ملفك الطبي من خلال الرابط التالي:\n\n` +
+      `هذا رابط التسجيل لأول مرة فقط:\n\n` +
       `${registrationUrl}\n\n` +
-      `بعد إكمال التسجيل ستتمكن من إضافة معلوماتك وخدماتك وحالاتك وصورك، وسيصبح لديك رابط صفحتك الخاصة الذي يمكنك مشاركته مع مرضاك وعلى صفحاتك.\n\n` +
-      `يرجى إكمال التسجيل قبل انتهاء صلاحية الرابط.`;
+      `بعد إكمال التسجيل وحفظ حسابك، استخدم رابط دخول الطبيب التالي بأي وقت للرجوع إلى حسابك بواسطة الإيميل وكلمة السر:\n\n` +
+      `${loginUrl}\n\n` +
+      `بعد تسجيل الدخول ستتمكن من إدارة معلوماتك وخدماتك وحالاتك وصورك من لوحة الطبيب.\n\n` +
+      `يرجى إكمال التسجيل قبل انتهاء صلاحية رابط التسجيل.`;
 
     const whatsappUrl =
       `https://wa.me/${phone}?text=${encodeURIComponent(

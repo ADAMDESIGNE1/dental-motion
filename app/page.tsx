@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 type Doctor = {
   id: string;
@@ -138,6 +139,65 @@ const PAYMENT_INFO = {
 
 export default function HomePage() {
   const router = useRouter();
+  const [canSeeAdmin, setCanSeeAdmin] =
+    useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkAdminAccess() {
+      try {
+        const {
+          data: sessionData,
+        } = await supabase.auth.getSession();
+
+        const user =
+          sessionData.session?.user;
+
+        if (!user) {
+          if (mounted) {
+            setCanSeeAdmin(false);
+          }
+          return;
+        }
+
+        const {
+          data,
+          error,
+        } = await supabase
+          .from("admin_users")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (!mounted) return;
+
+        setCanSeeAdmin(
+          !error && Boolean(data)
+        );
+      } catch {
+        if (mounted) {
+          setCanSeeAdmin(false);
+        }
+      }
+    }
+
+    checkAdminAccess();
+
+    const {
+      data: authListener,
+    } = supabase.auth.onAuthStateChange(
+      () => {
+        checkAdminAccess();
+      }
+    );
+
+    return () => {
+      mounted = false;
+      authListener.subscription.unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     let targetX = 0;
@@ -305,13 +365,15 @@ export default function HomePage() {
             مرر للأسفل للتعرف على الفريق
           </span>
 
-          <button
-            type="button"
-            className="home-admin-button"
-            onClick={openAdmin}
-          >
-            دخول الإدارة
-          </button>
+          {canSeeAdmin && (
+            <button
+              type="button"
+              className="home-admin-button"
+              onClick={openAdmin}
+            >
+              دخول الإدارة
+            </button>
+          )}
 
         </div>
 
@@ -1883,8 +1945,40 @@ export default function HomePage() {
             margin-top: 20px;
           }
 
-          .subscription-home-grid {
-            grid-template-columns: 1fr;
+          /* الاشتراكات والخدمات بالموبايل: بطاقات أفقية بالسحب */
+          .subscription-home-grid,
+          .pricing-grid {
+            display: grid !important;
+            grid-auto-flow: column !important;
+            grid-auto-columns: 82vw !important;
+            grid-template-columns: none !important;
+            gap: 16px !important;
+
+            width: calc(100vw - 20px) !important;
+            margin-left: calc(50% - 50vw + 10px) !important;
+            margin-right: calc(50% - 50vw + 10px) !important;
+            padding: 0 10px 18px !important;
+
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scroll-snap-type: x mandatory !important;
+            scroll-padding-inline: 10px !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: none;
+          }
+
+          .subscription-home-grid::-webkit-scrollbar,
+          .pricing-grid::-webkit-scrollbar {
+            display: none;
+          }
+
+          .subscription-home-card,
+          .pricing-card {
+            width: 100% !important;
+            min-width: 0 !important;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
           }
 
           .payment-home-grid {
@@ -1910,7 +2004,9 @@ export default function HomePage() {
 
         @media (max-width: 500px) {
 
-          .doctors-grid {
+          .doctors-grid,
+          .subscription-home-grid,
+          .pricing-grid {
             grid-auto-columns: 86vw !important;
             gap: 13px !important;
           }
