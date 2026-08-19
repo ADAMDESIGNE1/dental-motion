@@ -1,10 +1,152 @@
 "use client";
 
-import { useEffect, useRef } from "react";
-import { useParams, useRouter } from "next/navigation";
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import {
+  useParams,
+  useRouter,
+} from "next/navigation";
+
+import { supabase } from "@/lib/supabase";
+
 import styles from "./DoctorPage.module.css";
 
+/* =====================================================
+   TYPES
+===================================================== */
+
 type Doctor = {
+  id: string;
+  full_name: string | null;
+  specialty: string | null;
+  sub_specialty: string | null;
+  bio: string | null;
+  phone: string | null;
+  whatsapp_number: string | null;
+  clinic_name: string | null;
+  clinic_address: string | null;
+  profile_image: string | null;
+  slug: string | null;
+  subscription_active: boolean | null;
+  subscription_expires_at: string | null;
+  is_approved: boolean | null;
+};
+
+type DoctorCase = {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  before_image?: string | null;
+  after_image?: string | null;
+  video_url?: string | null;
+};
+
+/* =====================================================
+   VIDEO CARD
+===================================================== */
+
+function VideoCard({
+  video,
+  number,
+}: {
+  video: string;
+  number: number;
+}) {
+  const videoRef =
+    useRef<HTMLVideoElement>(null);
+
+  const handleMouseEnter = () => {
+    const element = videoRef.current;
+
+    if (!element) return;
+
+    element.currentTime = 0;
+
+    element
+      .play()
+      .catch(() => {});
+  };
+
+  const handleMouseLeave = () => {
+    const element = videoRef.current;
+
+    if (!element) return;
+
+    element.pause();
+    element.currentTime = 0;
+  };
+
+  return (
+    <article
+      className={styles.videoCard}
+      onMouseEnter={
+        handleMouseEnter
+      }
+      onMouseLeave={
+        handleMouseLeave
+      }
+    >
+      <video
+        ref={videoRef}
+        className={styles.video}
+        src={video}
+        muted
+        playsInline
+        preload="metadata"
+      />
+
+      <div
+        className={
+          styles.videoOverlay
+        }
+      />
+
+      <div
+        className={
+          styles.videoTop
+        }
+      >
+        <span>
+          {String(number).padStart(
+            2,
+            "0"
+          )}
+        </span>
+
+        <span>VIDEO</span>
+      </div>
+
+      <div
+        className={styles.play}
+      >
+        <span>▶</span>
+      </div>
+
+      <div
+        className={
+          styles.videoBottom
+        }
+      >
+        <span>
+          PLAY ON HOVER
+        </span>
+
+        <span>↗</span>
+      </div>
+    </article>
+  );
+}
+
+/* =====================================================
+   DOCTOR PAGE
+===================================================== */
+
+
+type LegacyDoctor = {
   id: string;
   name: string;
   specialty: string;
@@ -15,7 +157,7 @@ type Doctor = {
   videos: string[];
 };
 
-const doctors: Doctor[] = [
+const legacyDoctors: LegacyDoctor[] = [
   {
     id: "doctor1",
     name: "Dr. Ghassan",
@@ -204,79 +346,41 @@ const doctors: Doctor[] = [
 
 ];
 
-/* =====================================================
-   VIDEO CARD
-===================================================== */
-
-function VideoCard({
-  video,
-  number,
-}: {
-  video: string;
-  number: number;
-}) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  const handleMouseEnter = () => {
-    const videoElement = videoRef.current;
-
-    if (!videoElement) return;
-
-    videoElement.currentTime = 0;
-
-    videoElement.play().catch(() => {});
-  };
-
-  const handleMouseLeave = () => {
-    const videoElement = videoRef.current;
-
-    if (!videoElement) return;
-
-    videoElement.pause();
-    videoElement.currentTime = 0;
-  };
-
-  return (
-    <article
-      className={styles.videoCard}
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-    >
-      <video
-        ref={videoRef}
-        className={styles.video}
-        src={video}
-        muted
-        playsInline
-        preload="metadata"
-      />
-
-      <div className={styles.videoOverlay} />
-
-      <div className={styles.videoTop}>
-        <span>{String(number).padStart(2, "0")}</span>
-        <span>VIDEO</span>
-      </div>
-
-      <div className={styles.play}>
-        <span>▶</span>
-      </div>
-
-      <div className={styles.videoBottom}>
-        <span>PLAY ON HOVER</span>
-        <span>↗</span>
-      </div>
-    </article>
-  );
-}
-
-/* =====================================================
-   DOCTOR PAGE
-===================================================== */
-
 export default function DoctorPage() {
   const params = useParams();
   const router = useRouter();
+
+  const [doctor, setDoctor] =
+    useState<Doctor | null>(
+      null
+    );
+
+  const [cases, setCases] =
+    useState<DoctorCase[]>([]);
+
+  const [legacyVideos, setLegacyVideos] =
+    useState<string[]>([]);
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState("");
+
+  /* =====================================================
+     URL ID / SLUG
+  ===================================================== */
+
+  const doctorIdentifier =
+    Array.isArray(params.id)
+      ? params.id[0]
+      : params.id;
+
+  const isPortfolioDoctor =
+    legacyDoctors.some(
+      (item) =>
+        item.id === doctorIdentifier
+    );
 
   /* =====================================================
      MOUSE MOVEMENT
@@ -291,17 +395,30 @@ export default function DoctorPage() {
 
     let animationFrame = 0;
 
-    const handleMouseMove = (event: MouseEvent) => {
+    const handleMouseMove = (
+      event: MouseEvent
+    ) => {
       targetX =
-        (event.clientX / window.innerWidth - 0.5) * 2;
+        (event.clientX /
+          window.innerWidth -
+          0.5) *
+        2;
 
       targetY =
-        (event.clientY / window.innerHeight - 0.5) * 2;
+        (event.clientY /
+          window.innerHeight -
+          0.5) *
+        2;
     };
 
     const animate = () => {
-      currentX += (targetX - currentX) * 0.035;
-      currentY += (targetY - currentY) * 0.035;
+      currentX +=
+        (targetX - currentX) *
+        0.035;
+
+      currentY +=
+        (targetY - currentY) *
+        0.035;
 
       document.documentElement.style.setProperty(
         "--mouse-x",
@@ -313,12 +430,21 @@ export default function DoctorPage() {
         `${currentY}`
       );
 
-      animationFrame = requestAnimationFrame(animate);
+      animationFrame =
+        requestAnimationFrame(
+          animate
+        );
     };
 
-    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener(
+      "mousemove",
+      handleMouseMove
+    );
 
-    animationFrame = requestAnimationFrame(animate);
+    animationFrame =
+      requestAnimationFrame(
+        animate
+      );
 
     return () => {
       window.removeEventListener(
@@ -326,21 +452,294 @@ export default function DoctorPage() {
         handleMouseMove
       );
 
-      cancelAnimationFrame(animationFrame);
+      cancelAnimationFrame(
+        animationFrame
+      );
     };
   }, []);
 
   /* =====================================================
-     GET DOCTOR
+     LOAD DOCTOR
   ===================================================== */
 
-  const doctorId = Array.isArray(params.id)
-    ? params.id[0]
-    : params.id;
+  useEffect(() => {
+    let mounted = true;
 
-  const doctor = doctors.find(
-    (item) => item.id === doctorId
-  );
+    async function loadDoctor() {
+      if (!doctorIdentifier) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      const legacyDoctor =
+        legacyDoctors.find(
+          (item) =>
+            item.id === doctorIdentifier
+        );
+
+      if (legacyDoctor) {
+        setDoctor({
+          id: legacyDoctor.id,
+          full_name: legacyDoctor.name,
+          specialty: legacyDoctor.specialty,
+          sub_specialty: null,
+          bio: legacyDoctor.bio,
+          phone: legacyDoctor.phone,
+          whatsapp_number: null,
+          clinic_name: null,
+          clinic_address: legacyDoctor.location,
+          profile_image: legacyDoctor.image,
+          slug: legacyDoctor.id,
+          subscription_active: true,
+          subscription_expires_at:
+            "2999-12-31T23:59:59.000Z",
+          is_approved: true,
+        });
+
+        setCases([]);
+        setLegacyVideos(
+          legacyDoctor.videos
+        );
+        setLoading(false);
+        return;
+      }
+
+      setLegacyVideos([]);
+
+      try {
+        /*
+         * نحاول أولاً البحث بالـ slug.
+         */
+
+        let {
+          data: doctorData,
+          error: slugError,
+        } = await supabase
+          .from("doctors")
+          .select(
+            `
+            id,
+            full_name,
+            specialty,
+            sub_specialty,
+            bio,
+            phone,
+            whatsapp_number,
+            clinic_name,
+            clinic_address,
+            profile_image,
+            slug,
+            subscription_active,
+            subscription_expires_at,
+            is_approved
+            `
+          )
+          .eq(
+            "slug",
+            doctorIdentifier
+          )
+          .maybeSingle();
+
+        if (slugError) {
+          throw slugError;
+        }
+
+        /*
+         * إذا ما لقيناه بالـ slug،
+         * نحاول بالـ UUID.
+         */
+
+        if (!doctorData) {
+          const isUuid =
+            /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+              doctorIdentifier
+            );
+
+          if (isUuid) {
+            const {
+              data: idData,
+              error: idError,
+            } = await supabase
+              .from("doctors")
+              .select(
+                `
+                id,
+                full_name,
+                specialty,
+                sub_specialty,
+                bio,
+                phone,
+                whatsapp_number,
+                clinic_name,
+                clinic_address,
+                profile_image,
+                slug,
+                subscription_active,
+                subscription_expires_at,
+                is_approved
+                `
+              )
+              .eq(
+                "id",
+                doctorIdentifier
+              )
+              .maybeSingle();
+
+            if (idError) {
+              throw idError;
+            }
+
+            doctorData = idData;
+          }
+        }
+
+        if (!doctorData) {
+          if (mounted) {
+            setDoctor(null);
+            setLoading(false);
+          }
+
+          return;
+        }
+
+        /*
+         * لا نظهر الطبيب إذا الاشتراك
+         * غير فعال أو منتهي.
+         */
+
+        const expiry =
+          doctorData
+            .subscription_expires_at
+            ? new Date(
+                doctorData.subscription_expires_at
+              )
+            : null;
+
+        const subscriptionValid =
+          doctorData.subscription_active ===
+            true &&
+          expiry !== null &&
+          expiry.getTime() >
+            Date.now();
+
+        if (!subscriptionValid) {
+          if (mounted) {
+            setDoctor(null);
+
+            setError(
+              "اشتراك هذا الطبيب غير فعال حالياً."
+            );
+
+            setLoading(false);
+          }
+
+          return;
+        }
+
+        if (mounted) {
+          setDoctor(
+            doctorData as Doctor
+          );
+        }
+
+        /* =================================================
+           LOAD CASES
+        ================================================= */
+
+        const {
+          data: casesData,
+          error: casesError,
+        } = await supabase
+          .from("doctor_cases")
+          .select("*")
+          .eq(
+            "doctor_id",
+            doctorData.id
+          )
+          .eq(
+            "is_published",
+            true
+          )
+          .order(
+            "created_at",
+            {
+              ascending: false,
+            }
+          );
+
+        if (casesError) {
+          console.error(
+            "LOAD CASES:",
+            casesError
+          );
+        }
+
+        if (
+          mounted &&
+          casesData
+        ) {
+          setCases(
+            casesData as DoctorCase[]
+          );
+        }
+      } catch (err) {
+        const readableError =
+          err &&
+          typeof err === "object" &&
+          "message" in err
+            ? String(
+                (err as { message?: unknown }).message ||
+                  "تعذر تحميل الطبيب."
+              )
+            : err instanceof Error
+              ? err.message
+              : "تعذر تحميل الطبيب.";
+
+        if (mounted) {
+          setError(readableError);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    }
+
+    loadDoctor();
+
+    return () => {
+      mounted = false;
+    };
+  }, [doctorIdentifier]);
+
+  /* =====================================================
+     LOADING
+  ===================================================== */
+
+  if (loading) {
+    return (
+      <main
+        className={styles.page}
+      >
+        <div
+          className={
+            styles.notFound
+          }
+        >
+          <span>
+            DOCTOR PROFILE
+          </span>
+
+          <h1>
+            Loading...
+          </h1>
+        </div>
+      </main>
+    );
+  }
 
   /* =====================================================
      NOT FOUND
@@ -348,14 +747,26 @@ export default function DoctorPage() {
 
   if (!doctor) {
     return (
-      <main className={styles.page}>
-
+      <main
+        className={styles.page}
+      >
         <div
-          className={styles.cyberBackground}
+          className={
+            styles.cyberBackground
+          }
           aria-hidden="true"
         >
-          <div className={styles.cyberImage} />
-          <div className={styles.cyberDark} />
+          <div
+            className={
+              styles.cyberImage
+            }
+          />
+
+          <div
+            className={
+              styles.cyberDark
+            }
+          />
 
           <div
             className={`${styles.cyberBlueGlow} ${styles.glowOne}`}
@@ -369,10 +780,23 @@ export default function DoctorPage() {
             className={`${styles.cyberPurpleGlow} ${styles.glowThree}`}
           />
 
-          <div className={styles.cyberGrid} />
-          <div className={styles.cyberScanline} />
+          <div
+            className={
+              styles.cyberGrid
+            }
+          />
 
-          <div className={styles.cyberParticles}>
+          <div
+            className={
+              styles.cyberScanline
+            }
+          />
+
+          <div
+            className={
+              styles.cyberParticles
+            }
+          >
             <span />
             <span />
             <span />
@@ -384,53 +808,161 @@ export default function DoctorPage() {
           </div>
         </div>
 
-        <div className={styles.notFound}>
+        <div
+          className={
+            styles.notFound
+          }
+        >
+          <span>
+            DOCTOR PROFILE
+          </span>
 
-          <span>DOCTOR PROFILE</span>
+          <h1>
+            Doctor not found
+          </h1>
 
-          <h1>Doctor not found</h1>
+          {error && (
+            <p>{error}</p>
+          )}
 
           <button
-            onClick={() => router.push("/")}
+            onClick={() =>
+              router.push("/")
+            }
             type="button"
           >
             ← BACK TO TEAM
           </button>
-
         </div>
-
       </main>
     );
   }
 
   /* =====================================================
-     DOCTOR NUMBER
+     VALUES
   ===================================================== */
 
-  const doctorNumber = String(
-    doctors.findIndex(
-      (item) => item.id === doctor.id
-    ) + 1
-  ).padStart(2, "0");
+  const doctorName =
+    doctor.full_name ||
+    "Doctor";
+
+  const specialty =
+    doctor.sub_specialty ||
+    doctor.specialty ||
+    "Dental Specialist";
+
+  const image =
+    doctor.profile_image ||
+    "/logo.png";
+
+  const location =
+    doctor.clinic_address ||
+    doctor.clinic_name ||
+    "Iraq";
+
+  const phone =
+    doctor.whatsapp_number ||
+    doctor.phone ||
+    "";
+
+  const bio =
+    doctor.bio ||
+    "Dental specialist providing professional dental care and modern treatments.";
+
+  function normalizeWhatsAppNumber(
+    raw: string
+  ) {
+    let value =
+      raw.replace(/\D/g, "");
+
+    if (value.startsWith("00")) {
+      value = value.substring(2);
+    }
+
+    if (value.startsWith("0")) {
+      value =
+        "964" + value.substring(1);
+    } else if (!value.startsWith("964")) {
+      value =
+        "964" + value;
+    }
+
+    return value;
+  }
+
+  function openWhatsApp() {
+    const raw =
+      isPortfolioDoctor
+        ? "07803447144"
+        : doctor.whatsapp_number ||
+          doctor.phone;
+
+    if (!raw) return;
+
+    const whatsappNumber =
+      normalizeWhatsAppNumber(raw);
+
+    const text =
+      isPortfolioDoctor
+        ? `مرحباً ADAM DESIGN، شفت تصميم ${doctorName} وأريد تصميم/محتوى مشابه لهذا الشغل.`
+        : `مرحباً د. ${doctorName}، أريد الاستفسار عن خدماتك.`;
+
+    window.open(
+      `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(
+        text
+      )}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
+  /*
+   * إذا عندك video_url داخل doctor_cases
+   * راح تظهر الفيديوهات هنا.
+   */
+
+  const videos =
+    legacyVideos.length > 0
+      ? legacyVideos
+      : cases
+          .map(
+            (item) =>
+              item.video_url
+          )
+          .filter(
+            (
+              value
+            ): value is string =>
+              Boolean(value)
+          );
 
   /* =====================================================
      MAIN
   ===================================================== */
 
   return (
-    <main className={styles.page}>
-
-      {/* =================================================
-          BACKGROUND
-      ================================================= */}
+    <main
+      className={styles.page}
+    >
+      {/* BACKGROUND */}
 
       <div
-        className={styles.cyberBackground}
+        className={
+          styles.cyberBackground
+        }
         aria-hidden="true"
       >
-        <div className={styles.cyberImage} />
+        <div
+          className={
+            styles.cyberImage
+          }
+        />
 
-        <div className={styles.cyberDark} />
+        <div
+          className={
+            styles.cyberDark
+          }
+        />
 
         <div
           className={`${styles.cyberBlueGlow} ${styles.glowOne}`}
@@ -444,11 +976,23 @@ export default function DoctorPage() {
           className={`${styles.cyberPurpleGlow} ${styles.glowThree}`}
         />
 
-        <div className={styles.cyberGrid} />
+        <div
+          className={
+            styles.cyberGrid
+          }
+        />
 
-        <div className={styles.cyberScanline} />
+        <div
+          className={
+            styles.cyberScanline
+          }
+        />
 
-        <div className={styles.cyberParticles}>
+        <div
+          className={
+            styles.cyberParticles
+          }
+        >
           <span />
           <span />
           <span />
@@ -460,145 +1004,410 @@ export default function DoctorPage() {
         </div>
       </div>
 
-      {/* =================================================
-          NAV
-      ================================================= */}
+      {/* NAV */}
 
-      <header className={styles.nav}>
-
+      <header
+        className={styles.nav}
+      >
         <button
-          className={styles.backButton}
-          onClick={() => router.push("/")}
+          className={
+            styles.backButton
+          }
+          onClick={() =>
+            router.push("/")
+          }
           type="button"
         >
           ← BACK TO TEAM
         </button>
 
-        <div className={styles.logo}>
-          DENTAL <span>MOTION</span>
+        <div
+          className={styles.logo}
+        >
+          DENTAL{" "}
+          <span>MOTION</span>
         </div>
 
-        <div className={styles.navNumber}>
-          {doctorNumber}
+        <div
+          className={
+            styles.navNumber
+          }
+        >
+          DM
         </div>
-
       </header>
 
-      {/* =================================================
-          DOCTOR HEADING
-      ================================================= */}
+      {/* DOCTOR */}
 
-      <section className={styles.heading}>
-
-        <div className={styles.doctorProfile}>
-
-          {/* =================================================
-              PHOTO
-          ================================================= */}
-
-          <div className={styles.doctorPhoto}>
-
+      <section
+        className={
+          styles.heading
+        }
+      >
+        <div
+          className={
+            styles.doctorProfile
+          }
+        >
+          <div
+            className={
+              styles.doctorPhoto
+            }
+          >
             <img
-              src={doctor.image}
-              alt={doctor.name}
-              className={styles.doctorPhotoImage}
+              src={image}
+              alt={doctorName}
+              className={
+                styles.doctorPhotoImage
+              }
             />
-
           </div>
 
-          {/* =================================================
-              DOCTOR INFORMATION
-          ================================================= */}
-
-          <div className={styles.doctorInfo}>
-
-            <span className={styles.eyebrow}>
-              {doctor.specialty}
+          <div
+            className={
+              styles.doctorInfo
+            }
+          >
+            <span
+              className={
+                styles.eyebrow
+              }
+            >
+              {specialty}
             </span>
 
             <h1>
-              {doctor.name}
+              {doctorName}
             </h1>
 
-            <p>
-              {doctor.bio}
-            </p>
+            <p>{bio}</p>
 
-            <p>
-              📍 {doctor.location}
-            </p>
+            {doctor.clinic_name && (
+              <p>
+                🦷{" "}
+                {doctor.clinic_name}
+              </p>
+            )}
 
-            <p>
-              ☎ {doctor.phone}
-            </p>
+            {doctor.clinic_address && (
+              <p>
+                📍 {doctor.clinic_address}
+              </p>
+            )}
 
-            <p>
-              Selected work &amp; treatments
-            </p>
+            {!doctor.clinic_address &&
+              location && (
+                <p>
+                  📍 {location}
+                </p>
+              )}
 
+            {!isPortfolioDoctor &&
+              phone && (
+                <p>
+                  ☎ {phone}
+                </p>
+              )}
+
+            {isPortfolioDoctor && (
+              <div
+                style={{
+                  marginTop: 12,
+                  padding: "14px 16px",
+                  background:
+                    "rgba(37,211,102,.06)",
+                  border:
+                    "1px solid rgba(37,211,102,.2)",
+                  maxWidth: 460,
+                }}
+              >
+                <strong
+                  style={{
+                    display: "block",
+                    marginBottom: 7,
+                    color: "#fff",
+                  }}
+                >
+                  عجبك هذا الشغل؟
+                </strong>
+
+                <span
+                  style={{
+                    display: "block",
+                    color:
+                      "rgba(255,255,255,.55)",
+                    fontSize: 11,
+                    lineHeight: 1.8,
+                  }}
+                >
+                  إذا تريد تصميم أو محتوى مشابه لهذا لطبيبك أو عيادتك،
+                  تواصل مباشرة ويا ADAM DESIGN على WhatsApp.
+                </span>
+              </div>
+            )}
+
+            {(isPortfolioDoctor ||
+              doctor.whatsapp_number ||
+              doctor.phone) && (
+              <button
+                type="button"
+                onClick={
+                  openWhatsApp
+                }
+                style={{
+                  marginTop: 12,
+                  padding:
+                    "12px 18px",
+                  background:
+                    "#25D366",
+                  color: "#fff",
+                  border: 0,
+                  cursor:
+                    "pointer",
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                {isPortfolioDoctor
+                  ? "أريد تصميم مثل هذا — WhatsApp"
+                  : "تواصل عبر WhatsApp"}
+              </button>
+            )}
+
+            <p
+              style={{
+                marginTop: 18,
+              }}
+            >
+              Selected work
+              &amp; treatments
+            </p>
           </div>
-
         </div>
 
-        <div className={styles.line} />
-
+        <div
+          className={styles.line}
+        />
       </section>
 
-      {/* =================================================
-          WORK
-      ================================================= */}
+      {/* WORK */}
 
-      <section className={styles.workSection}>
-
-        <div className={styles.workHeader}>
-
+      <section
+        className={
+          styles.workSection
+        }
+      >
+        <div
+          className={
+            styles.workHeader
+          }
+        >
           <div>
-
-            <span className={styles.eyebrow}>
+            <span
+              className={
+                styles.eyebrow
+              }
+            >
               SELECTED WORK
             </span>
 
             <h2>
-              Videos
+              Cases
               <br />
-              <em>&amp; treatments.</em>
-            </h2>
 
+              <em>
+                &amp; treatments.
+              </em>
+            </h2>
           </div>
 
           <p>
-            Move your cursor over each video
+            Selected dental
+            cases
             <br />
-            to discover the work.
+            and treatments.
           </p>
-
         </div>
 
-        <div className={styles.videosList}>
+        {/* VIDEOS */}
 
-          {doctor.videos.map((video, index) => (
+        {videos.length > 0 && (
+          <div
+            className={
+              styles.videosList
+            }
+          >
+            {videos.map(
+              (
+                video,
+                index
+              ) => (
+                <VideoCard
+                  key={`${video}-${index}`}
+                  video={video}
+                  number={
+                    index + 1
+                  }
+                />
+              )
+            )}
+          </div>
+        )}
 
-            <VideoCard
-              key={video}
-              video={video}
-              number={index + 1}
-            />
+        {/* BEFORE / AFTER */}
 
-          ))}
+        {cases.length > 0 && (
+          <div
+            style={{
+              display:
+                "grid",
 
-        </div>
+              gridTemplateColumns:
+                "repeat(auto-fit, minmax(280px, 1fr))",
 
+              gap: "24px",
+
+              marginTop:
+                "40px",
+            }}
+          >
+            {cases.map(
+              (item) => (
+                <article
+                  key={
+                    item.id
+                  }
+                  style={{
+                    border:
+                      "1px solid rgba(0,140,255,.18)",
+
+                    padding:
+                      "16px",
+
+                    background:
+                      "rgba(0,10,20,.45)",
+                  }}
+                >
+                  {item.title && (
+                    <h3>
+                      {
+                        item.title
+                      }
+                    </h3>
+                  )}
+
+                  {item.description && (
+                    <p>
+                      {
+                        item.description
+                      }
+                    </p>
+                  )}
+
+                  <div
+                    style={{
+                      display:
+                        "grid",
+
+                      gridTemplateColumns:
+                        "1fr 1fr",
+
+                      gap:
+                        "10px",
+                    }}
+                  >
+                    {item.before_image && (
+                      <div>
+                        <small>
+                          BEFORE
+                        </small>
+
+                        <img
+                          src={
+                            item.before_image
+                          }
+                          alt="Before"
+                          style={{
+                            width:
+                              "100%",
+                            height:
+                              "320px",
+                            objectFit:
+                              "contain",
+                            marginTop:
+                              "8px",
+                            display:
+                              "block",
+                            background:
+                              "#05080d",
+                          }}
+                        />
+                      </div>
+                    )}
+
+                    {item.after_image && (
+                      <div>
+                        <small>
+                          AFTER
+                        </small>
+
+                        <img
+                          src={
+                            item.after_image
+                          }
+                          alt="After"
+                          style={{
+                            width:
+                              "100%",
+                            height:
+                              "320px",
+                            objectFit:
+                              "contain",
+                            marginTop:
+                              "8px",
+                            display:
+                              "block",
+                            background:
+                              "#05080d",
+                          }}
+                        />
+                      </div>
+                    )}
+                  </div>
+                </article>
+              )
+            )}
+          </div>
+        )}
+
+        {cases.length === 0 && (
+          <p
+            style={{
+              marginTop:
+                "40px",
+
+              opacity: 0.55,
+            }}
+          >
+            لا توجد حالات منشورة
+            حالياً.
+          </p>
+        )}
       </section>
 
-      {/* =================================================
-          FOOTER
-      ================================================= */}
+      {/* FOOTER */}
 
-      <footer className={styles.footer}>
-
+      <footer
+        className={
+          styles.footer
+        }
+      >
         <div>
-
-          <span className={styles.footerLabel}>
+          <span
+            className={
+              styles.footerLabel
+            }
+          >
             DENTAL MOTION
           </span>
 
@@ -607,19 +1416,20 @@ export default function DoctorPage() {
             <br />
             tells a story.
           </h2>
-
         </div>
 
         <button
-          className={styles.footerButton}
-          onClick={() => router.push("/")}
+          className={
+            styles.footerButton
+          }
+          onClick={() =>
+            router.push("/")
+          }
           type="button"
         >
           BACK TO TEAM
         </button>
-
       </footer>
-
     </main>
   );
 }

@@ -1,3 +1,6 @@
 .next/
 node_modules/
 public/video/*.mp4
+.env.local
+.vscode/
+supabase/.temp/
