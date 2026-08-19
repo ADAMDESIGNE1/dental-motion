@@ -30,6 +30,7 @@ type Doctor = {
   clinic_name: string | null;
   clinic_address: string | null;
   profile_image: string | null;
+  certificates: string[] | null;
   slug: string | null;
   subscription_active: boolean | null;
   subscription_expires_at: string | null;
@@ -59,42 +60,102 @@ function VideoCard({
   const videoRef =
     useRef<HTMLVideoElement>(null);
 
-  const handleMouseEnter = () => {
+  const playMutedOnHover = async () => {
     const element = videoRef.current;
 
     if (!element) return;
 
     element.currentTime = 0;
 
-    element
-      .play()
-      .catch(() => {});
+    /*
+     * المتصفحات تمنع الصوت التلقائي بالـ hover
+     * إذا ما صار تفاعل فعلي من المستخدم قبلها.
+     * لذلك نخلي الـ hover يبدأ الفيديو، وإذا المتصفح
+     * يسمح بالصوت بعد تفاعل سابق نفتح الصوت.
+     */
+    const userActivation =
+      typeof navigator !== "undefined" &&
+      "userActivation" in navigator
+        ? (navigator as Navigator & {
+            userActivation?: {
+              hasBeenActive?: boolean;
+            };
+          }).userActivation
+        : undefined;
+
+    element.muted =
+      !userActivation?.hasBeenActive;
+
+    element.volume = 1;
+
+    try {
+      await element.play();
+    } catch {
+      element.muted = true;
+
+      try {
+        await element.play();
+      } catch {}
+    }
   };
 
-  const handleMouseLeave = () => {
+  const playWithSound = async () => {
+    const element = videoRef.current;
+
+    if (!element) return;
+
+    element.currentTime = 0;
+    element.muted = false;
+    element.volume = 1;
+
+    try {
+      await element.play();
+    } catch {
+      /*
+       * إذا منع المتصفح التشغيل بالصوت، نشغله muted
+       * حتى ما يبقى الفيديو متوقف.
+       */
+      element.muted = true;
+
+      try {
+        await element.play();
+      } catch {}
+    }
+  };
+
+  const stopPlayback = () => {
     const element = videoRef.current;
 
     if (!element) return;
 
     element.pause();
     element.currentTime = 0;
+    element.muted = true;
   };
 
   return (
     <article
       className={styles.videoCard}
       onMouseEnter={
-        handleMouseEnter
+        playMutedOnHover
       }
       onMouseLeave={
-        handleMouseLeave
+        stopPlayback
+      }
+      onPointerDown={
+        playWithSound
+      }
+      onTouchStart={
+        playWithSound
+      }
+      onClick={
+        playWithSound
       }
     >
       <video
         ref={videoRef}
         className={styles.video}
         src={video}
-        muted
         playsInline
         preload="metadata"
       />
@@ -123,7 +184,7 @@ function VideoCard({
       <div
         className={styles.play}
       >
-        <span>▶</span>
+        <span>🔊</span>
       </div>
 
       <div
@@ -132,7 +193,7 @@ function VideoCard({
         }
       >
         <span>
-          PLAY ON HOVER
+          HOVER TO PLAY • CLICK / TOUCH FOR SOUND
         </span>
 
         <span>↗</span>
@@ -157,6 +218,8 @@ type LegacyDoctor = {
   videos: string[];
 };
 
+const R2_VIDEO_BASE = "https://pub-16b672e0754a40d4b790366e9efdc79f.r2.dev/doctor1";
+
 const legacyDoctors: LegacyDoctor[] = [
   {
     id: "doctor1",
@@ -167,12 +230,12 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in cosmetic dentistry, smile design and advanced dental treatments.",
     videos: [
-    "https://res.cloudinary.com/mihbnzji/video/upload/v1787080827/doctor1-1.mp4",
-      "/video/doctor1-2.mp4",
-      "/video/doctor1-3.mp4",
- "/video/doctor1-4.mp4",
-      "/video/doctor1-5.mp4",
-      "/video/doctor1-6.mp4",
+    `${R2_VIDEO_BASE}/doctor1-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor1-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor1-3.mp4`,
+ `${R2_VIDEO_BASE}/doctor1-4.mp4`,
+      `${R2_VIDEO_BASE}/doctor1-5.mp4`,
+      `${R2_VIDEO_BASE}/doctor1-6.mp4`,
     ],
   },
 
@@ -185,12 +248,12 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Dental specialist focused on modern treatments and comprehensive patient care.",
     videos: [
-      "/video/doctor2-1.mp4",
-      "/video/doctor2-2.mp4",
-      "/video/doctor2-3.mp4",
- "/video/doctor2-4.mp4",
-      "/video/doctor2-5.mp4",
-      "/video/doctor2-6.mp4",
+      `${R2_VIDEO_BASE}/doctor2-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor2-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor2-3.mp4`,
+ `${R2_VIDEO_BASE}/doctor2-4.mp4`,
+      `${R2_VIDEO_BASE}/doctor2-5.mp4`,
+      `${R2_VIDEO_BASE}/doctor2-6.mp4`,
     ],
   },
 
@@ -203,9 +266,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in aesthetic dentistry, smile makeovers and modern dental solutions.",
     videos: [
-      "/video/doctor3-1.mp4",
-      "/video/doctor3-2.mp4",
-      "/video/doctor3-3.mp4",
+      `${R2_VIDEO_BASE}/doctor3-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor3-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor3-3.mp4`,
     ],
   },
 
@@ -218,9 +281,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Dental specialist providing modern and precise dental treatments.",
     videos: [
-      "/video/doctor4-1.mp4",
-      "/video/doctor4-2.mp4",
-      "/video/doctor4-3.mp4",
+      `${R2_VIDEO_BASE}/doctor4-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor4-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor4-3.mp4`,
     ],
   },
 
@@ -233,9 +296,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Dental specialist dedicated to precision, comfort and high-quality dental care.",
     videos: [
-      "/video/doctor5-1.mp4",
-      "/video/doctor5-2.mp4",
-      "/video/doctor5-3.mp4",
+      `${R2_VIDEO_BASE}/doctor5-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor5-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor5-3.mp4`,
     ],
   },
 
@@ -248,12 +311,12 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Dental specialist working with modern dental techniques and advanced treatments.",
     videos: [
-      "/video/doctor6-1.mp4",
-      "/video/doctor6-2.mp4",
-      "/video/doctor6-3.mp4",
-"/video/doctor6-4.mp4",
-      "/video/doctor6-5.mp4",
-      "/video/doctor6-6.mp4",
+      `${R2_VIDEO_BASE}/doctor6-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor6-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor6-3.mp4`,
+`${R2_VIDEO_BASE}/doctor6-4.mp4`,
+      `${R2_VIDEO_BASE}/doctor6-5.mp4`,
+      `${R2_VIDEO_BASE}/doctor6-6.mp4`,
 
     ],
   },
@@ -267,9 +330,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in aesthetic dentistry and creating natural, confident smiles.",
     videos: [
-      "/video/doctor7-1.mp4",
-      "/video/doctor7-2.mp4",
-      "/video/doctor7-3.mp4",
+      `${R2_VIDEO_BASE}/doctor7-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor7-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor7-3.mp4`,
     ],
 },
 {
@@ -281,9 +344,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in aesthetic dentistry and creating natural, confident smiles.",
     videos: [
-      "/video/doctor8-1.mp4",
-      "/video/doctor8-2.mp4",
-      "/video/doctor8-3.mp4",
+      `${R2_VIDEO_BASE}/doctor8-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor8-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor8-3.mp4`,
     ],
 },
 {
@@ -295,9 +358,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in aesthetic dentistry and creating natural, confident smiles.",
     videos: [
-      "/video/doctor9-1.mp4",
-      "/video/doctor9-2.mp4",
-      "/video/doctor9-3.mp4",
+      `${R2_VIDEO_BASE}/doctor9-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor9-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor9-3.mp4`,
     ],
 
   },
@@ -310,9 +373,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in aesthetic dentistry and creating natural, confident smiles.",
     videos: [
-      "/video/doctor10-1mp4",
-     "/video/doctor10-2mp4",
-"/video/doctor10-3mp4",
+      `${R2_VIDEO_BASE}/doctor10-1mp4`,
+     `${R2_VIDEO_BASE}/doctor10-2mp4`,
+`${R2_VIDEO_BASE}/doctor10-3mp4`,
     ],
  },
 {
@@ -324,9 +387,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in aesthetic dentistry and creating natural, confident smiles.",
     videos: [
-      "/video/doctor11-1.mp4",
-      "/video/doctor11-2.mp4",
-      "/video/doctor11-3.mp4",
+      `${R2_VIDEO_BASE}/doctor11-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor11-2.mp4`,
+      `${R2_VIDEO_BASE}/doctor11-3.mp4`,
     ],
  },
 {
@@ -338,9 +401,9 @@ const legacyDoctors: LegacyDoctor[] = [
     phone: "+964 780 344 7144",
     bio: "Specialist in aesthetic dentistry and creating natural, confident smiles.",
     videos: [
-      "/video/doctor12-1.mp4",
-      "/video/doctor12-2.MP4",
-      "/video/doctor12-3.MP4",
+      `${R2_VIDEO_BASE}/doctor12-1.mp4`,
+      `${R2_VIDEO_BASE}/doctor12-2.MP4`,
+      `${R2_VIDEO_BASE}/doctor12-3.MP4`,
     ],
  },
 
@@ -492,6 +555,7 @@ export default function DoctorPage() {
           clinic_name: null,
           clinic_address: legacyDoctor.location,
           profile_image: legacyDoctor.image,
+          certificates: null,
           slug: legacyDoctor.id,
           subscription_active: true,
           subscription_expires_at:
@@ -531,6 +595,7 @@ export default function DoctorPage() {
             clinic_name,
             clinic_address,
             profile_image,
+            certificates,
             slug,
             subscription_active,
             subscription_expires_at,
@@ -576,6 +641,7 @@ export default function DoctorPage() {
                 clinic_name,
                 clinic_address,
                 profile_image,
+                certificates,
                 slug,
                 subscription_active,
                 subscription_expires_at,
@@ -825,14 +891,6 @@ export default function DoctorPage() {
             <p>{error}</p>
           )}
 
-          <button
-            onClick={() =>
-              router.push("/")
-            }
-            type="button"
-          >
-            ← BACK TO TEAM
-          </button>
         </div>
       </main>
     );
@@ -867,7 +925,13 @@ export default function DoctorPage() {
 
   const bio =
     doctor.bio ||
-    "Dental specialist providing professional dental care and modern treatments.";
+    "لم تتم إضافة نبذة مهنية بعد.";
+
+  const certificates =
+    !isPortfolioDoctor &&
+    Array.isArray(doctor.certificates)
+      ? doctor.certificates.filter(Boolean)
+      : [];
 
   function normalizeWhatsAppNumber(
     raw: string
@@ -890,7 +954,9 @@ export default function DoctorPage() {
     return value;
   }
 
-  function openWhatsApp() {if (!doctor) return;
+  function openWhatsApp() {
+    if (!doctor) return;
+
     const raw =
       isPortfolioDoctor
         ? "07803447144"
@@ -1009,17 +1075,19 @@ export default function DoctorPage() {
       <header
         className={styles.nav}
       >
-        <button
-          className={
-            styles.backButton
-          }
-          onClick={() =>
-            router.push("/")
-          }
-          type="button"
-        >
-          ← BACK TO TEAM
-        </button>
+        {isPortfolioDoctor && (
+          <button
+            className={
+              styles.backButton
+            }
+            onClick={() =>
+              router.push("/")
+            }
+            type="button"
+          >
+            ← BACK TO TEAM
+          </button>
+        )}
 
         <div
           className={styles.logo}
@@ -1080,7 +1148,15 @@ export default function DoctorPage() {
               {doctorName}
             </h1>
 
-            <p>{bio}</p>
+            {!isPortfolioDoctor && (
+              <p>
+                صفحة الطبيب الرسمية على ADAM DESIGN
+              </p>
+            )}
+
+            {isPortfolioDoctor && (
+              <p>{bio}</p>
+            )}
 
             {doctor.clinic_name && (
               <p>
@@ -1190,6 +1266,135 @@ export default function DoctorPage() {
         />
       </section>
 
+      {!isPortfolioDoctor && (
+        <section
+          dir="rtl"
+          style={{
+            maxWidth: 1180,
+            margin: "0 auto 42px",
+            padding: "0 24px",
+          }}
+        >
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns:
+                certificates.length > 0
+                  ? "minmax(0,1fr) minmax(0,1fr)"
+                  : "1fr",
+              gap: 22,
+            }}
+          >
+            <div
+              style={{
+                padding: 24,
+                background: "rgba(0,10,20,.45)",
+                border: "1px solid rgba(0,140,255,.18)",
+              }}
+            >
+              <span
+                style={{
+                  color: "#32baff",
+                  fontSize: 10,
+                  letterSpacing: ".12em",
+                }}
+              >
+                ABOUT
+              </span>
+
+              <h2
+                style={{
+                  margin: "8px 0 14px",
+                  color: "#fff",
+                  fontSize: 26,
+                  fontWeight: 500,
+                }}
+              >
+                نبذة عني
+              </h2>
+
+              <p
+                style={{
+                  margin: 0,
+                  color: "rgba(255,255,255,.68)",
+                  lineHeight: 2,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {bio}
+              </p>
+            </div>
+
+            {certificates.length > 0 && (
+              <div
+                style={{
+                  padding: 24,
+                  background: "rgba(0,10,20,.45)",
+                  border: "1px solid rgba(199,168,93,.2)",
+                }}
+              >
+                <span
+                  style={{
+                    color: "#c7a85d",
+                    fontSize: 10,
+                    letterSpacing: ".12em",
+                  }}
+                >
+                  CERTIFICATES
+                </span>
+
+                <h2
+                  style={{
+                    margin: "8px 0 14px",
+                    color: "#fff",
+                    fontSize: 26,
+                    fontWeight: 500,
+                  }}
+                >
+                  الشهادات والمؤهلات
+                </h2>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                      "repeat(auto-fit,minmax(150px,1fr))",
+                    gap: 12,
+                  }}
+                >
+                  {certificates.map((url, index) => (
+                    <a
+                      key={`${url}-${index}`}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        display: "block",
+                        textDecoration: "none",
+                      }}
+                    >
+                      <img
+                        src={url}
+                        alt={`شهادة ${index + 1}`}
+                        style={{
+                          width: "100%",
+                          height: 190,
+                          objectFit: "contain",
+                          display: "block",
+                          background: "#05080d",
+                          border:
+                            "1px solid rgba(255,255,255,.08)",
+                        }}
+                      />
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
+
       {/* WORK */}
 
       <section
@@ -1233,9 +1438,7 @@ export default function DoctorPage() {
 
         {videos.length > 0 && (
           <div
-            className={
-              styles.videosList
-            }
+            className={`${styles.videosList} mobileVideosScroller`}
           >
             {videos.map(
               (
@@ -1418,18 +1621,76 @@ export default function DoctorPage() {
           </h2>
         </div>
 
-        <button
-          className={
-            styles.footerButton
-          }
-          onClick={() =>
-            router.push("/")
-          }
-          type="button"
-        >
-          BACK TO TEAM
-        </button>
+        {isPortfolioDoctor && (
+          <button
+            className={
+              styles.footerButton
+            }
+            onClick={() =>
+              router.push("/")
+            }
+            type="button"
+          >
+            BACK TO TEAM
+          </button>
+        )}
       </footer>
+
+      <style jsx global>{`
+        @media (max-width: 768px) {
+          .mobileVideosScroller {
+            display: grid !important;
+            grid-auto-flow: column !important;
+            grid-auto-columns: 82vw !important;
+            grid-template-columns: none !important;
+            gap: 14px !important;
+
+            width: calc(100vw - 24px) !important;
+            margin-left: calc(50% - 50vw + 12px) !important;
+            margin-right: calc(50% - 50vw + 12px) !important;
+            padding: 0 12px 14px !important;
+
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scroll-snap-type: x mandatory !important;
+            scroll-padding-inline: 12px !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: none;
+          }
+
+          .mobileVideosScroller::-webkit-scrollbar {
+            display: none;
+          }
+
+          .mobileVideosScroller > article {
+            width: 100% !important;
+            min-width: 0 !important;
+            height: 360px !important;
+            min-height: 360px !important;
+            max-height: 360px !important;
+            scroll-snap-align: start;
+          }
+
+          .mobileVideosScroller > article video {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .mobileVideosScroller {
+            grid-auto-columns: 86vw !important;
+          }
+
+          .mobileVideosScroller > article {
+            height: 330px !important;
+            min-height: 330px !important;
+            max-height: 330px !important;
+          }
+        }
+      `}</style>
     </main>
   );
 }

@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { supabase } from "@/lib/supabase";
 
 type Doctor = {
   id: string;
@@ -137,11 +136,8 @@ const PAYMENT_INFO = {
   },
 };
 
-const ADMIN_EMAIL = "alialshamrefe13@gmail.com";
-
 export default function HomePage() {
   const router = useRouter();
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let targetX = 0;
@@ -196,41 +192,6 @@ export default function HomePage() {
       );
 
       cancelAnimationFrame(animationFrame);
-    };
-  }, []);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function checkAdmin() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!mounted) return;
-
-      setIsAdmin(
-        session?.user?.email === ADMIN_EMAIL
-      );
-    }
-
-    checkAdmin();
-
-    const {
-      data: authListener,
-    } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        if (!mounted) return;
-
-        setIsAdmin(
-          session?.user?.email === ADMIN_EMAIL
-        );
-      }
-    );
-
-    return () => {
-      mounted = false;
-      authListener.subscription.unsubscribe();
     };
   }, []);
 
@@ -344,15 +305,13 @@ export default function HomePage() {
             مرر للأسفل للتعرف على الفريق
           </span>
 
-          {isAdmin && (
-            <button
-              type="button"
-              className="home-admin-button"
-              onClick={openAdmin}
-            >
-              دخول الإدارة
-            </button>
-          )}
+          <button
+            type="button"
+            className="home-admin-button"
+            onClick={openAdmin}
+          >
+            دخول الإدارة
+          </button>
 
         </div>
 
@@ -1865,6 +1824,53 @@ export default function HomePage() {
 
         @media (max-width: 800px) {
 
+          /* الأطباء بالموبايل: سحب أفقي بدل النزول بالطول */
+          .doctors-section {
+            overflow: visible;
+          }
+
+          .doctors-grid {
+            display: grid !important;
+            grid-auto-flow: column !important;
+            grid-auto-columns: 82vw !important;
+            grid-template-columns: none !important;
+            gap: 16px !important;
+
+            width: calc(100vw - 20px) !important;
+            margin-left: calc(50% - 50vw + 10px) !important;
+            margin-right: calc(50% - 50vw + 10px) !important;
+            padding: 0 10px 18px !important;
+
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scroll-snap-type: x mandatory !important;
+            scroll-padding-inline: 10px !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: none;
+          }
+
+          .doctors-grid::-webkit-scrollbar {
+            display: none;
+          }
+
+          .doctor-card {
+            width: 100% !important;
+            min-width: 0 !important;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+          }
+
+          .doctor-image-wrap {
+            width: 100% !important;
+          }
+
+          .doctor-image {
+            width: 100% !important;
+            height: auto !important;
+            display: block !important;
+          }
+
           .subscription-home-section {
             padding: 25px 20px;
           }
@@ -1903,6 +1909,11 @@ export default function HomePage() {
         }
 
         @media (max-width: 500px) {
+
+          .doctors-grid {
+            grid-auto-columns: 86vw !important;
+            gap: 13px !important;
+          }
 
           .subscription-home-heading h2 {
             font-size: 29px;
