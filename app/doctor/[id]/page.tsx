@@ -1666,10 +1666,12 @@ export default function DoctorPage() {
           .mobileVideosScroller > article {
             width: 100% !important;
             min-width: 0 !important;
-            height: 360px !important;
-            min-height: 360px !important;
-            max-height: 360px !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            aspect-ratio: 9 / 16 !important;
             scroll-snap-align: start;
+            scroll-snap-stop: always;
           }
 
           .mobileVideosScroller > article video {
@@ -1685,9 +1687,10 @@ export default function DoctorPage() {
           }
 
           .mobileVideosScroller > article {
-            height: 330px !important;
-            min-height: 330px !important;
-            max-height: 330px !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            aspect-ratio: 9 / 16 !important;
           }
         }
       `}</style>
