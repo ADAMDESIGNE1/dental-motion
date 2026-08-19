@@ -1461,6 +1461,7 @@ export default function DoctorPage() {
 
         {cases.length > 0 && (
           <div
+            className="mobileCasesScroller"
             style={{
               display:
                 "grid",
@@ -1480,6 +1481,7 @@ export default function DoctorPage() {
                   key={
                     item.id
                   }
+                  className="mobileCaseCard"
                   style={{
                     border:
                       "1px solid rgba(0,140,255,.18)",
@@ -1530,6 +1532,8 @@ export default function DoctorPage() {
                             item.before_image
                           }
                           alt="Before"
+                          loading="lazy"
+                          decoding="async"
                           style={{
                             width:
                               "100%",
@@ -1559,6 +1563,8 @@ export default function DoctorPage() {
                             item.after_image
                           }
                           alt="After"
+                          loading="lazy"
+                          decoding="async"
                           style={{
                             width:
                               "100%",
@@ -1679,11 +1685,54 @@ export default function DoctorPage() {
             height: 100% !important;
             object-fit: cover !important;
           }
+
+          /* حالات الطبيب بالموبايل: نفس فكرة البطاقات الأفقية */
+          .mobileCasesScroller {
+            display: grid !important;
+            grid-auto-flow: column !important;
+            grid-auto-columns: 82vw !important;
+            grid-template-columns: none !important;
+            gap: 14px !important;
+
+            width: calc(100vw - 24px) !important;
+            margin-left: calc(50% - 50vw + 12px) !important;
+            margin-right: calc(50% - 50vw + 12px) !important;
+            padding: 0 12px 14px !important;
+
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scroll-snap-type: x mandatory !important;
+            scroll-padding-inline: 12px !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: none;
+          }
+
+          .mobileCasesScroller::-webkit-scrollbar {
+            display: none;
+          }
+
+          .mobileCasesScroller > .mobileCaseCard {
+            width: 100% !important;
+            min-width: 0 !important;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+          }
+
+          .mobileCaseCard img {
+            height: 250px !important;
+            object-fit: contain !important;
+          }
         }
 
         @media (max-width: 430px) {
-          .mobileVideosScroller {
+          .mobileVideosScroller,
+          .mobileCasesScroller {
             grid-auto-columns: 86vw !important;
+          }
+
+          .mobileCaseCard img {
+            height: 220px !important;
           }
 
           .mobileVideosScroller > article {

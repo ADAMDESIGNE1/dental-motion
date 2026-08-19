@@ -402,7 +402,7 @@ export default function DoctorDashboardPage() {
     cases.filter((item) => item.is_published).length;
 
   const publishedCasesLimit =
-    currentPlan === "premium" ? 10 : 2;
+    currentPlan === "premium" ? 150 : 2;
 
   const canPublishMore =
     publishedCasesCount < publishedCasesLimit;
@@ -814,6 +814,45 @@ export default function DoctorDashboardPage() {
 
   return (
     <main dir="rtl" style={pageStyle}>
+      <style>{`
+        @media (max-width: 800px) {
+          .mobileDashboardCasesScroller {
+            display: grid !important;
+            grid-auto-flow: column !important;
+            grid-auto-columns: 86vw !important;
+            grid-template-columns: none !important;
+            gap: 14px !important;
+            width: 100% !important;
+            overflow-x: auto !important;
+            overflow-y: hidden !important;
+            scroll-snap-type: x mandatory !important;
+            scroll-padding-inline: 0 !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-inline: contain;
+            scrollbar-width: none;
+            padding-bottom: 12px !important;
+          }
+
+          .mobileDashboardCasesScroller::-webkit-scrollbar {
+            display: none;
+          }
+
+          .mobileDashboardCaseCard {
+            width: 100% !important;
+            min-width: 0 !important;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+          }
+        }
+
+        @media (max-width: 430px) {
+          .mobileDashboardCasesScroller {
+            grid-auto-columns: 88vw !important;
+            gap: 12px !important;
+          }
+        }
+      `}</style>
+
       <div style={containerStyle}>
 
         <header style={headerStyle}>
@@ -1180,11 +1219,15 @@ export default function DoctorDashboardPage() {
               لا توجد حالات مضافة حالياً.
             </div>
           ) : (
-            <div style={casesGrid}>
+            <div
+              style={casesGrid}
+              className="mobileDashboardCasesScroller"
+            >
               {cases.map((item) => (
                 <article
                   key={item.id}
                   style={caseCard}
+                  className="mobileDashboardCaseCard"
                 >
                   {editingId === item.id ? (
                     <div style={editingBox}>
