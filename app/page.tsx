@@ -508,6 +508,41 @@ export default function HomePage() {
             وصناعة محتوى يليق بابتسامة كل طبيب.
           </p>
 
+          <button
+            type="button"
+            className="home-course-teaser"
+            onClick={() => router.push("/course")}
+          >
+            <span className="home-course-poster">
+              <span className="home-course-poster-loop" />
+
+              <span className="home-course-poster-inner">
+                <img
+                  src="/dental-editing-course-2000.png"
+                  alt="Dental Motion Course"
+                />
+              </span>
+            </span>
+
+            <span className="home-course-copy">
+              <small>
+                COMING SOON
+              </small>
+
+              <strong>
+                DENTAL MOTION COURSE
+              </strong>
+
+              <em>
+                اكتشف الكورس واحجز اهتمامك
+              </em>
+            </span>
+
+            <span className="home-course-arrow">
+              ↗
+            </span>
+          </button>
+
           <div className="personal-hero-line" />
 
           <span className="personal-hero-scroll">
@@ -1771,6 +1806,374 @@ export default function HomePage() {
       ===================================================== */}
 
       <style jsx>{`
+
+        /* =====================================================
+           DENTAL MOTION COURSE — HOME TEASER
+        ===================================================== */
+
+        .home-course-teaser {
+          position: relative;
+
+          width:
+            min(
+              100%,
+              430px
+            );
+
+          margin-top: 24px;
+
+          padding:
+            11px 13px;
+
+          display: grid;
+
+          grid-template-columns:
+            56px
+            minmax(0,1fr)
+            28px;
+
+          gap: 12px;
+
+          align-items: center;
+
+          overflow: hidden;
+
+          text-align: left;
+
+          color: #fff;
+
+          background:
+            linear-gradient(
+              110deg,
+              rgba(9,31,58,.88),
+              rgba(3,12,26,.92)
+            );
+
+          border:
+            1px solid
+            rgba(79,185,255,.24);
+
+          border-radius: 14px;
+
+          box-shadow:
+            0 14px 38px
+            rgba(0,0,0,.24),
+            inset 0 1px 0
+            rgba(255,255,255,.035);
+
+          cursor: pointer;
+
+          transition:
+            transform .25s ease,
+            border-color .25s ease,
+            box-shadow .25s ease;
+        }
+
+        .home-course-teaser::before {
+          content: "";
+
+          position: absolute;
+
+          width: 140px;
+          height: 140px;
+
+          top: -90px;
+          left: -70px;
+
+          border-radius: 50%;
+
+          background:
+            radial-gradient(
+              circle,
+              rgba(64,181,255,.20),
+              transparent 70%
+            );
+
+          animation:
+            homeCourseOrb
+            4.5s
+            ease-in-out
+            infinite;
+
+          pointer-events: none;
+        }
+
+        .home-course-teaser::after {
+          content: "";
+
+          position: absolute;
+
+          top: 0;
+          bottom: 0;
+
+          width: 90px;
+
+          left: -110px;
+
+          transform:
+            skewX(-18deg);
+
+          background:
+            linear-gradient(
+              90deg,
+              transparent,
+              rgba(255,255,255,.08),
+              transparent
+            );
+
+          animation:
+            homeCourseSweep
+            4.2s
+            ease-in-out
+            infinite;
+
+          pointer-events: none;
+        }
+
+        .home-course-teaser:hover {
+          transform:
+            translateY(-3px);
+
+          border-color:
+            rgba(79,185,255,.55);
+
+          box-shadow:
+            0 19px 46px
+            rgba(0,0,0,.32),
+            0 0 30px
+            rgba(52,167,255,.10);
+        }
+
+        .home-course-poster {
+          position: relative;
+          z-index: 2;
+
+          width: 56px;
+          height: 56px;
+
+          padding: 2px;
+
+          overflow: hidden;
+
+          border-radius: 13px;
+
+          flex-shrink: 0;
+
+          box-shadow:
+            0 9px 26px
+            rgba(0,0,0,.30),
+            0 0 24px
+            rgba(54,174,255,.10);
+        }
+
+        .home-course-poster-loop {
+          position: absolute;
+
+          inset: -70%;
+
+          background:
+            conic-gradient(
+              from 0deg,
+              transparent 0deg,
+              transparent 220deg,
+              rgba(79,186,255,.15) 245deg,
+              #65cbff 278deg,
+              #d8f4ff 302deg,
+              #577cff 324deg,
+              transparent 348deg,
+              transparent 360deg
+            );
+
+          animation:
+            homeCoursePosterLoop
+            3.6s
+            linear
+            infinite;
+        }
+
+        .home-course-poster-inner {
+          position: relative;
+          z-index: 2;
+
+          width: 100%;
+          height: 100%;
+
+          display: block;
+
+          overflow: hidden;
+
+          border-radius: 11px;
+
+          background: #020711;
+        }
+
+        .home-course-poster-inner img {
+          width: 100%;
+          height: 100%;
+
+          display: block;
+
+          object-fit: cover;
+
+          transition:
+            transform .35s ease;
+        }
+
+        .home-course-teaser:hover
+        .home-course-poster-inner img {
+          transform:
+            scale(1.07);
+        }
+
+        .home-course-copy {
+          position: relative;
+          z-index: 2;
+
+          display: block;
+          min-width: 0;
+        }
+
+        .home-course-copy small {
+          display: block;
+
+          margin-bottom: 3px;
+
+          color: #65c8ff;
+
+          font-size: 7px;
+          font-weight: 900;
+
+          letter-spacing: .18em;
+
+          animation:
+            homeCoursePulse
+            2.1s
+            ease-in-out
+            infinite;
+        }
+
+        .home-course-copy strong {
+          display: block;
+
+          color: #fff;
+
+          font-family:
+            Georgia,
+            serif;
+
+          font-size:
+            clamp(
+              13px,
+              1.5vw,
+              17px
+            );
+
+          font-weight: 400;
+
+          letter-spacing: .035em;
+        }
+
+        .home-course-copy em {
+          display: block;
+
+          margin-top: 4px;
+
+          color:
+            rgba(255,255,255,.36);
+
+          font-size: 8px;
+
+          font-style: normal;
+        }
+
+        .home-course-arrow {
+          position: relative;
+          z-index: 2;
+
+          color: #68c9ff;
+
+          font-size: 20px;
+
+          transition:
+            transform .25s ease;
+        }
+
+        .home-course-teaser:hover
+        .home-course-arrow {
+          transform:
+            translate(3px,-3px);
+        }
+
+        @keyframes homeCoursePosterLoop {
+          to {
+            transform:
+              rotate(360deg);
+          }
+        }
+
+        @keyframes homeCourseOrb {
+          0%,
+          100% {
+            opacity: .55;
+            transform:
+              scale(.95);
+          }
+
+          50% {
+            opacity: .95;
+            transform:
+              scale(1.08);
+          }
+        }
+
+        @keyframes homeCourseSweep {
+          0%,
+          54% {
+            left: -110px;
+          }
+
+          78%,
+          100% {
+            left: 115%;
+          }
+        }
+
+        @keyframes homeCoursePulse {
+          0%,
+          100% {
+            opacity: .55;
+          }
+
+          50% {
+            opacity: 1;
+          }
+        }
+
+        @media
+        (max-width: 700px) {
+          .home-course-teaser {
+            width:
+              min(
+                100%,
+                390px
+              );
+
+            margin-left: auto;
+            margin-right: auto;
+          }
+        }
+
+        @media
+        (prefers-reduced-motion: reduce) {
+          .home-course-teaser::before,
+          .home-course-teaser::after,
+          .home-course-copy small,
+          .home-course-poster-loop {
+            animation:
+              none !important;
+          }
+        }
+
 
         .subscription-steps-section {
           margin: 34px 0 26px;
